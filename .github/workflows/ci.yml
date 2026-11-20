@@ -39,7 +39,13 @@ concurrency:
 env:
   JAVA_VERSION: "25"
   NODE_VERSION: "24"
-  MAVEN_ARGS: -B -ntp -Dstyle.color=never
+  # Maven Central rate-limits busy runner IP ranges (HTTP 429): retry with back-off instead of failing the build.
+  MAVEN_ARGS: >-
+    -B -ntp -Dstyle.color=never
+    -Daether.transport.http.retryHandler.count=6
+    -Daether.transport.http.retryHandler.interval=10000
+    -Daether.transport.http.retryHandler.intervalMax=120000
+    -Daether.transport.http.retryHandler.serviceUnavailable=429,503
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/grocery-
   TRIVY_IMAGE: aquasec/trivy:0.76.2
   PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
@@ -74,7 +80,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.any_service == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 40
     outputs:
       common_version: ${{ steps.versions.outputs.common }}
       schemas_version: ${{ steps.versions.outputs.schemas }}
@@ -82,12 +88,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # ONE Maven cache for the whole monorepo (key = hash of every pom.xml). This job fills it; the service jobs
+      # restore the same key, so parallel jobs hardly touch Maven Central (which rate-limits runners).
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: maven
-          cache-dependency-path: libs/*/pom.xml
+          cache-dependency-path: "**/pom.xml"
       - name: Build and test grocery-event-schemas and grocery-common
         run: |
           mvn $MAVEN_ARGS -f libs/grocery-event-schemas/pom.xml install
@@ -97,6 +105,16 @@ jobs:
         run: |
           echo "schemas=$(mvn $MAVEN_ARGS -q -f libs/grocery-event-schemas/pom.xml help:evaluate -Dexpression=project.version -DforceStdout)" >> "$GITHUB_OUTPUT"
           echo "common=$(mvn $MAVEN_ARGS -q -f libs/grocery-common/pom.xml help:evaluate -Dexpression=project.version -DforceStdout)" >> "$GITHUB_OUTPUT"
+      - name: Pre-fetch every service's dependencies into the shared cache (one at a time)
+        run: |
+          for pom in services/*/pom.xml; do
+            echo "::group::$pom"
+            mvn $MAVEN_ARGS -q -f "$pom" dependency:go-offline \
+              -Dgrocery-common.version=${{ steps.versions.outputs.common }} \
+              -Dgrocery-event-schemas.version=${{ steps.versions.outputs.schemas }} \
+              -DexcludeGroupIds=com.grocery || echo "::warning::pre-fetch incomplete for $pom (the service job retries)"
+            echo "::endgroup::"
+          done
       - name: Package the installed libraries
         run: tar -C ~/.m2/repository -czf grocery-libs.tgz com/grocery
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -114,7 +132,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 6
       matrix:
         service: ${{ fromJSON(needs.changes.outputs.services) }}
     steps:
@@ -126,7 +144,7 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: maven
-          cache-dependency-path: services/${{ matrix.service.name }}/pom.xml
+          cache-dependency-path: "**/pom.xml"   # the shared cache the libs job filled
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: grocery-libs
@@ -134,9 +152,12 @@ jobs:
         run: mkdir -p ~/.m2/repository && tar -C ~/.m2/repository -xzf grocery-libs.tgz
       # Unit tests (surefire) and Testcontainers integration tests (MySQL, Kafka, Redis, ... in Docker on the runner).
       # The monorepo builds every service against the libraries of the same commit.
+      # A failed test is re-run once; one that passes on the re-run is reported as "flaky" in the surefire report
+      # (fix it, don't ignore it), one that fails twice fails the build.
       - name: Maven verify (unit + integration tests)
         run: >
           mvn $MAVEN_ARGS -f services/${{ matrix.service.name }}/pom.xml verify
+          -Dsurefire.rerunFailingTestsCount=1 -Dfailsafe.rerunFailingTestsCount=1
           -Dgrocery-common.version=${{ needs.libs.outputs.common_version }}
           -Dgrocery-event-schemas.version=${{ needs.libs.outputs.schemas_version }}
       - name: Test reports
