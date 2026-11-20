@@ -68,6 +68,8 @@ ARG APK_UPGRADE=true
 # nginx itself comes from nginx.org's Alpine repository, which the base image removes after installing it, so a plain
 # `apk upgrade` cannot pick up an nginx security release. The repository is added back for the upgrade only, with
 # the signing key verified against the same pinned SHA-512 the official nginx Dockerfiles use.
+# Added 2026-11-21 for nginx 1.30.7 (CVE-2026-113425, -118899, -121810, -123007, -123633, -123634; the newest base
+# image still had 1.30.6). Once NGINX_IMAGE is a tag that already ships the fixed nginx, this step changes nothing.
 ARG NGINX_KEY_SHA512=e09fa32f0a0eab2b879ccbbc4d0e4fb9751486eedda75e35fac65802cc9faa266425edf83e261137a2f4d16281ce2c1a5f4502930fe75154723da014214f0655
 USER root
 RUN if [ "$APK_UPGRADE" = "true" ]; then \
