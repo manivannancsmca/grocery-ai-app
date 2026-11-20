@@ -19,6 +19,7 @@
     <properties>
         <java.version>25</java.version>
         <grocery-common.version>0.10.1</grocery-common.version>
+        <grocery-event-schemas.version>1.7.0</grocery-event-schemas.version>
         <spring-ai.version>2.0.2</spring-ai.version>
     </properties>
 
@@ -102,7 +103,7 @@
         <dependency>
             <groupId>com.grocery</groupId>
             <artifactId>grocery-event-schemas</artifactId>
-            <version>1.7.0</version>
+            <version>${grocery-event-schemas.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -124,7 +125,7 @@
         <dependency>
             <groupId>com.grocery</groupId>
             <artifactId>grocery-event-schemas</artifactId>
-            <version>1.7.0</version>
+            <version>${grocery-event-schemas.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>

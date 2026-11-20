@@ -36,7 +36,9 @@ class AdminDeliveryIntegrationTest extends DispatchTestSupport {
 
     @Test
     void theListFiltersAndShowsThePartnerAndTheSearch() throws Exception {
-        Instant later = T0.plus(Duration.ofDays(10));                   // newer than every other test's delivery
+        // Newer than every other test's delivery: tests that do not pin the clock use the real time (MutableClock),
+        // so a fixed date (T0 + 10 days) stopped being the newest once the real date passed it.
+        Instant later = Instant.now().plus(Duration.ofDays(1)).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         clock.set(later);
         UUID rider = onlinePartnerAt("Ravi Kumar", at(1.0, 0));
         Order assigned = searchingOrder();
