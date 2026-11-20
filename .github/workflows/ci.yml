@@ -373,7 +373,9 @@ jobs:
   gitops:
     name: Update the GitOps repository
     needs: [changes, images]
-    if: always() && needs.images.result == 'success'
+    # Also when SOME images failed: only images that passed their gate wrote a deploy record (the record is the
+    # last step of the images job), so a failed image is never deployed, and the others are not held back.
+    if: always() && (needs.images.result == 'success' || needs.images.result == 'failure')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # One update at a time across all runs, oldest first, never cancelled.
