@@ -1,0 +1,14 @@
+# Reviewed gitleaks findings that are not secrets (fingerprint = commit:file:rule:line). Each one is a test fixture
+# or documentation value; a new finding anywhere still fails CI. Reviewed 2026-11-21:
+#   jenkins.yaml:43              a Docker volume name (GROCERY_CI_M2_VOLUME)
+#   ApprovalSigningKey.java:24   Javadoc mentioning the PEM header
+#   UnitTests.java               a key generated at test time
+#   GatewayRoutingIntegrationTest  a fake approval JWT with an empty payload (e30 = {}) and an idempotency UUID
+#   PasswordEmailsIntegrationTest  base64 of 'forgot-password-test-token...' / 'old-event-token...'
+0049f69bab5340818dbd8aa8089b56dfbcce04ba:infrastructure/ci/jenkins/local/casc/jenkins.yaml:generic-api-key:43
+0049f69bab5340818dbd8aa8089b56dfbcce04ba:services/ai-orchestrator-service/src/main/java/com/grocery/ai/approval/ApprovalSigningKey.java:private-key:24
+0049f69bab5340818dbd8aa8089b56dfbcce04ba:services/ai-orchestrator-service/src/test/java/com/grocery/ai/UnitTests.java:private-key:186
+0049f69bab5340818dbd8aa8089b56dfbcce04ba:services/api-gateway/src/test/java/com/grocery/gateway/GatewayRoutingIntegrationTest.java:generic-api-key:272
+0049f69bab5340818dbd8aa8089b56dfbcce04ba:services/api-gateway/src/test/java/com/grocery/gateway/GatewayRoutingIntegrationTest.java:generic-api-key:597
+0049f69bab5340818dbd8aa8089b56dfbcce04ba:services/notification-service/src/test/java/com/grocery/notification/PasswordEmailsIntegrationTest.java:generic-api-key:116
+0049f69bab5340818dbd8aa8089b56dfbcce04ba:services/notification-service/src/test/java/com/grocery/notification/PasswordEmailsIntegrationTest.java:generic-api-key:184

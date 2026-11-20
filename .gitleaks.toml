@@ -1,0 +1,9 @@
+# gitleaks configuration (read automatically from the repository root by the CI "Secrets in the git history" step).
+# The default rules stay on; only reviewed false positives are allowed here. Single reviewed findings in test
+# fixtures are listed by fingerprint in .gitleaksignore instead, so a NEW match in the same file still fails CI.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Jenkins plugin pins (<plugin>:<version>-<build hash>) look like API keys but are public version strings"
+paths = ['''infrastructure/ci/jenkins/local/plugins\.txt''']
