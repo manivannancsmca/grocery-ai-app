@@ -392,6 +392,16 @@ jobs:
           pattern: deploy-record-*
           path: deploy-records
           merge-multiple: true
+      # Without the key, actions/checkout would silently fall back to this repository's token over HTTPS (the GitOps
+      # repository is public, so the clone works) and only the push would fail. Say what is missing instead.
+      - name: Require the GitOps deploy key
+        env:
+          HAS_KEY: ${{ secrets.GITOPS_DEPLOY_KEY != '' }}
+        run: |
+          if [[ "$HAS_KEY" != "true" ]]; then
+            echo "::error::Secret GITOPS_DEPLOY_KEY is not set: add the private half of a deploy key with write access to grocery-gitops (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
       - name: Check out the GitOps repository (write deploy key, this repository only)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
