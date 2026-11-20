@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "DeliveryFailed",
+  "namespace": "com.grocery.events.delivery",
+  "doc": "The partner could not deliver the order after pickup; order-service moves the order to DELIVERY_FAILED and an admin decides on a refund. Producer: delivery-service, topic delivery.events, key orderId (outbox aggregate type Delivery).",
+  "fields": [
+    {"name": "deliveryId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery."},
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "partnerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery partner (= the partner's user id)."},
+    {"name": "reason", "type": "string", "doc": "One of: CUSTOMER_UNREACHABLE, ADDRESS_NOT_FOUND, CUSTOMER_REFUSED, OTHER."},
+    {"name": "note", "type": ["null", "string"], "default": null, "doc": "Free-text note from the partner; null if none."},
+    {"name": "failedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the delivery failed (UTC)."}
+  ]
+}

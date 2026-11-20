@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "PriceChangeRequested",
+  "namespace": "com.grocery.events.pricing",
+  "doc": "A vendor's price change exceeds the approval threshold and waits for an admin (the live price is unchanged). Producer: pricing-service, topic pricing.events, key productId.",
+  "fields": [
+    {"name": "requestId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the price change request."},
+    {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product (message key)."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that requested the change."},
+    {"name": "productName", "type": "string", "doc": "Product name from pricing's product projection."},
+    {"name": "oldMrp", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Current (live) MRP, 2 decimals."},
+    {"name": "oldSellingPrice", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Current (live) selling price, 2 decimals."},
+    {"name": "newMrp", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Requested MRP, 2 decimals."},
+    {"name": "newSellingPrice", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Requested selling price, 2 decimals."},
+    {"name": "changePercent", "type": {"type": "bytes", "logicalType": "decimal", "precision": 10, "scale": 2}, "doc": "Signed change of the selling price in percent, (new - old) / old x 100, 2 decimals HALF_UP (column DECIMAL(10,2))."},
+    {"name": "requestedBy", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the vendor user who requested the change."}
+  ]
+}

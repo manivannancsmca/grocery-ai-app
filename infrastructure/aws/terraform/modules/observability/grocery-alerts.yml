@@ -1,0 +1,89 @@
+# Phase 13 alert rules (contract docs/api/phase-13-observability-and-testing.md §2) as Amazon Managed Prometheus rules.
+# Alerts on infrastructure without a Prometheus exporter in AWS are CloudWatch alarms instead (modules/observability
+# main.tf and modules/msk-connect): DatabaseDown, RedisDown, KafkaConsumerLagHigh, ConnectorTaskFailed.
+# ElasticsearchDown is watched by Elastic Cloud's own monitoring (no CloudWatch metric for an Elastic Cloud deployment).
+# Set var.alert_rules_file to use infrastructure/local/observability/prometheus/alerts.yml instead once it exists.
+groups:
+  - name: grocery-services
+    rules:
+      - alert: ServiceDown
+        expr: up{job="services"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} is down (task {{ $labels.task_id }})"
+      - alert: HighErrorRate
+        expr: |
+          sum by (service) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / sum by (service) (rate(http_server_requests_seconds_count[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }}: more than 5 % of requests fail with 5xx"
+      - alert: SlowRequests
+        expr: |
+          histogram_quantile(0.95,
+            sum by (service, le) (rate(http_server_requests_seconds_bucket{uri!~".*(stream|chat|events).*"}[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }}: p95 latency above 1 s"
+      - alert: JvmHeapHigh
+        expr: |
+          sum by (service, task_id) (jvm_memory_used_bytes{area="heap"})
+            / sum by (service, task_id) (jvm_memory_max_bytes{area="heap"} > 0) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }}: heap above 90 %"
+  - name: grocery-business
+    rules:
+      - alert: DeadLettersPending
+        expr: max by (service, consumer_group) (grocery_dead_letters_pending) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.consumer_group }}: dead letters waiting for replay"
+      - alert: StuckOrders
+        expr: max by (reason) (grocery_orders_stuck) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Stuck orders ({{ $labels.reason }})"
+      - alert: PaymentFailureSpike
+        expr: |
+          (
+            sum(increase(grocery_events_published_total{event_type="PaymentFailed"}[15m]))
+              / sum(increase(grocery_events_published_total{event_type=~"PaymentFailed|PaymentCaptured"}[15m]))
+          ) > 0.3
+          and sum(increase(grocery_events_published_total{event_type=~"PaymentFailed|PaymentCaptured"}[15m])) >= 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 30 % of payments failed in 15 minutes"
+      - alert: ReconciliationFailures
+        expr: sum(increase(grocery_payments_reconciliation_failures_total[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Payment reconciliation failures in the last 15 minutes"
+      - alert: AiModelUnavailable
+        expr: max by (provider) (grocery_ai_model_available) == 0
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "The assistant has no model ({{ $labels.provider }}); chat answers AI_UNAVAILABLE"
+      - alert: EmailFailures
+        expr: sum(increase(grocery_emails_total{status="FAILED"}[30m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Emails failed in the last 30 minutes"

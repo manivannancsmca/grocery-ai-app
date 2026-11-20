@@ -1,0 +1,7 @@
+// The MSK Connect custom plugin ZIP (Debezium MySQL connector + msk-config-providers) uploaded per environment to
+// the plugin bucket Terraform creates (modules/msk-connect). See infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryDebeziumPluginPipeline(
+    debeziumVersion: '3.7.1.Final'   // keep equal to the local Kafka Connect image (quay.io/debezium/connect)
+)

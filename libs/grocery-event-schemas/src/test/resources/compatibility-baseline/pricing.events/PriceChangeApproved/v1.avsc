@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "PriceChangeApproved",
+  "namespace": "com.grocery.events.pricing",
+  "doc": "An admin approved a pending price change request; the new price is live (the same transaction also publishes PriceChanged). Producer: pricing-service, topic pricing.events, key productId.",
+  "fields": [
+    {"name": "requestId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the price change request."},
+    {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product (message key)."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that requested the change."},
+    {"name": "approvedBy", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the approving admin."}
+  ]
+}

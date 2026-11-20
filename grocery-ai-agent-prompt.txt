@@ -1,0 +1,618 @@
+# Enterprise Grocery Platform – Architecture and Implementation Blueprint
+
+## 1. Role and Responsibilities
+
+Act as a Senior Software Architect, Senior Java/Spring Boot Engineer, Microservices Architect, AI Solution Architect, Database Architect, and Senior DevOps Engineer.
+
+I have approximately 8 years of experience working with Java and Spring Boot microservices. However, I want the implementation to remain simple, clean, maintainable, and understandable.
+
+Think like an architect designing a real enterprise application that can evolve from an initial deployment to a platform supporting millions of customers.
+
+Do not introduce unnecessary technologies, design patterns, microservices, or infrastructure components without explaining their business and technical value.
+
+Challenge my assumptions whenever you identify architectural problems. Recommend better alternatives with clear explanations.
+
+## 2. Project Overview
+
+I want to build an enterprise-level grocery commerce platform using:
+
+- Java 21 or a newer supported LTS version.
+- Latest stable Spring Boot version.
+- Spring Cloud.
+- Spring AI.
+- MySQL.
+- Apache Kafka.
+- Apache Debizium Connector
+- Elasticsearch
+- Redis
+- React.js.
+- TypeScript.
+- Tailwind CSS.
+
+The application must follow microservices architecture.
+
+Each microservice must be independently developed, built, tested, deployed, and scalable.
+
+My primary database requirement is MySQL as the source of truth for transactional business data.
+
+## 3. Business Stakeholders
+
+The application should support these stakeholders:
+
+1. Admin
+2. Customer
+3. Restaurant Owner
+4. Delivery Partner
+5. Vendor
+
+Each stakeholder should have a dedicated dashboard and role-specific functionality.
+
+### Admin
+- Dashboard and business analytics.
+- Customer management.
+- Vendor management.
+- Restaurant management.
+- Product and category management.
+- Order monitoring.
+- Delivery monitoring.
+- Payment and refund monitoring.
+- Platform configuration.
+- AI-powered business insights.
+- Human approval workflows.
+
+### Customer
+- Registration and login.
+- Product and restaurant discovery.
+- Product search.
+- Shopping cart.
+- Checkout.
+- Online payments.
+- Order tracking.
+- Order cancellation and returns.
+- Reviews and ratings.
+- AI shopping assistant.
+
+### Vendor
+- Vendor registration.
+- Product management.
+- Inventory management.
+- Pricing management.
+- Stock updates.
+- Purchase and supply management.
+- Order-related operations.
+- AI vendor assistant.
+
+### Restaurant Owner
+- Restaurant registration and profile management.
+- Menu management.
+- Product availability.
+- Incoming orders.
+- Order acceptance and rejection.
+- Order preparation status.
+- Sales reports.
+- AI restaurant assistant.
+
+### Delivery Partner
+- Delivery partner registration.
+- Availability management.
+- Delivery assignment.
+- Order pickup.
+- Delivery status updates.
+- Location tracking.
+- Delivery history.
+- AI delivery assistant.
+
+## 4. Expected Business Scale
+
+Design the architecture considering the following expected business scale:
+
+- Approximately 200 product categories.
+- Approximately 1,000 grocery products initially.
+- Approximately 1,000 restaurants.
+- Up to 1 million registered customers in the future.
+
+Do not assume that one million registered customers means one million concurrent users.
+
+Explain the difference between registered users, active users, concurrent users, requests per second, and peak transaction throughput.
+
+Recommend a scalable architecture that can grow gradually without introducing unnecessary infrastructure costs initially.
+
+## 5. Microservices Architecture
+
+Identify the correct microservices based on business capabilities and bounded contexts.
+
+Consider the following services:
+
+- API Gateway Service.
+- Identity and Authentication Service.
+- Customer Service.
+- Vendor Service.
+- Restaurant Service.
+- Product Catalog Service ( write and read service - should be two service). write with mysql and read with Elasticsearch
+- Inventory Service.
+- Pricing Service.
+- Cart Service.
+- Order Service.
+- Payment Service.
+- Delivery Service.
+- Notification Service.
+- Review and Rating Service.
+- AI Orchestrator Service.
+
+These are candidate services, not mandatory deployment units.
+
+For each proposed microservice, explain:
+
+1. Business responsibility.
+2. Main features.
+3. REST API responsibilities.
+4. Database ownership.
+5. Kafka event publishing.
+6. Kafka event consumption.
+7. Communication with other services.
+8. Independent deployment strategy.
+9. Scaling requirements.
+
+Avoid unnecessary microservice fragmentation.
+
+Explain which services should be implemented initially and which can be introduced later.
+
+## 6. Database Architecture
+
+Use MySQL as the source of truth.
+
+Follow database-per-service architecture.
+
+Requirements:
+
+- Each microservice owns its business database.
+- Never allow one microservice to directly access another microservice's database.
+- Avoid shared database tables between services.
+- Use Flyway for database version management.
+- Use proper primary keys, foreign keys within service boundaries, indexes, and constraints.
+- Use transactions for business-critical operations.
+- Implement idempotency for critical APIs.
+- Use optimistic locking wherever appropriate.
+- Explain eventual consistency and distributed transaction handling.
+- use apche debizium connector for CDC from mysql to Elasticsearch. Example Product write data (mysql) and read data (Elasticsearch)
+
+For local development, allow a single MySQL server/container with separate databases for individual microservices to reduce resource consumption.
+
+For production, support independent databases or appropriately isolated database instances based on service requirements.
+
+## 7. Event-Driven Architecture
+
+Use Apache Kafka for asynchronous communication between microservices.
+
+Implement:
+
+- Event-driven architecture.
+- Domain events.
+- Event publishers and consumers.
+- Transactional Outbox Pattern.
+- Idempotent consumers.
+- Retry mechanisms.
+- Dead Letter Topics.
+- Event versioning.
+- Consumer group management.
+- Kafka partitioning strategy.
+- Message ordering where business-critical.
+- Duplicate event handling.
+
+Use Saga choreography for suitable distributed business workflows.
+
+Explain when orchestration is preferable to choreography.
+
+Important business scenario:
+
+When a customer places an order:
+
+1. Order Service creates the order.
+2. Inventory Service reserves available stock.
+3. Payment Service processes payment.
+4. Restaurant receives the order.
+5. Delivery Service handles delivery assignment.
+6. Customer receives status updates.
+7. Admin dashboard receives relevant business activity.
+
+Define all success, failure, timeout, cancellation, refund, and compensation scenarios.
+
+Never assume all distributed operations succeed.
+
+## 8. Real-Time Stakeholder Updates
+
+This is one of the most important requirements.
+
+Whenever a stakeholder performs a relevant business operation, other authorized stakeholders should receive real-time updates without refreshing the React application.
+
+Examples:
+
+- Vendor updates product stock: relevant customer and admin screens receive availability updates.
+- Restaurant accepts an order: customer and admin dashboards receive updates.
+- Customer places an order: restaurant receives an incoming order notification.
+- Delivery partner accepts an assignment: restaurant, customer, and admin receive appropriate updates.
+- Delivery partner updates delivery status: customer receives the latest status.
+- Admin suspends a vendor: affected vendor operations are updated appropriately.
+
+Design the solution using:
+
+- Kafka for internal event distribution.
+- WebSocket or Server-Sent Events for frontend updates.
+- Notification Service for stakeholder-specific notifications.
+- Redis where appropriate for connection coordination and temporary state.
+
+Explain how to support multiple backend replicas and reconnecting clients.
+
+Ensure users receive only notifications they are authorized to see.
+
+Do not broadcast every event to every user.
+
+## 9. Agentic AI Architecture Using Spring AI
+
+Agentic AI is a major requirement.
+
+Design an AI architecture using Spring AI.
+
+Consider:
+
+- AI Orchestrator Service.
+- Specialized AI agents.
+- Spring AI tool calling.
+- Structured output.
+- Conversation management.
+- Context management.
+- Memory management.
+- Human-in-the-loop approval.
+- Tool authorization.
+- Audit logging.
+- AI execution monitoring.
+- Error handling and fallback mechanisms.
+
+Create specialized agents for:
+
+1. Customer Shopping Agent.
+2. Vendor Management Agent.
+3. Restaurant Operations Agent.
+4. Delivery Operations Agent.
+5. Admin Business Intelligence Agent.
+
+Each agent must interact with business services through explicitly defined backend tools.
+
+AI must never directly access MySQL databases.
+
+### Human Approval Requirements
+
+Implement human approval wherever an operation is sensitive or has financial or operational consequences.
+
+Examples:
+
+- Customer confirms final purchase.
+- Vendor confirms sensitive product or pricing changes.
+- Restaurant owner approves exceptional order decisions.
+- Delivery manager approves sensitive delivery reassignment.
+- Admin approves refunds, account suspension, and sensitive administrative operations.
+
+Design an approval lifecycle:
+
+PENDING_APPROVAL → APPROVED → EXECUTING → COMPLETED
+
+Also support:
+
+REJECTED, EXPIRED, FAILED, and CANCELLED.
+
+Important rules:
+
+- AI must not bypass authorization.
+- AI must not approve its own actions.
+- Backend services must validate approval before execution.
+- Approval must be bound to the exact proposed action and its parameters.
+- Prevent duplicate execution.
+- Record who approved, what was approved, and when.
+- Provide a clear explanation of the action before requesting approval.
+
+Explain which operations can be executed automatically and which require human approval.
+
+Do not build an uncontrolled autonomous agent that can execute arbitrary business operations.
+
+## 10. React.js Frontend Architecture
+
+Use:
+
+- React.js.
+- TypeScript.
+- Tailwind CSS.
+- React Router.
+- React Query or an appropriate server-state management solution.
+- WebSocket or SSE for real-time updates.
+
+Design clean, modern, responsive dashboards for all five stakeholders.
+
+Explain whether we should initially use:
+
+- One React application with role-based dashboards.
+- Separate React applications for each stakeholder.
+
+Recommend the simplest architecture that preserves future independent deployment options.
+
+Frontend requirements:
+
+- Responsive design.
+- Role-based navigation.
+- Reusable components.
+- Centralized API clients.
+- Secure session handling.
+- Loading and error states.
+- Real-time notification center.
+- Search and filtering.
+- Pagination.
+- Dashboard analytics.
+- AI chat interface.
+- Human approval interface.
+
+## 11. Security Architecture
+
+Design production-conscious security.
+
+Consider:
+
+- Spring Security.
+- JWT access tokens.
+- Refresh token rotation.
+- Role-based access control.
+- Fine-grained permissions.
+- API Gateway security.
+- Service-to-service authentication.
+- Secrets management.
+- CORS and CSRF considerations.
+- Rate limiting.
+- Input validation.
+- Audit logging.
+- Protection against unauthorized AI tool execution.
+
+Explain how each stakeholder can access only authorized functionality and data.
+
+## 12. Search, Caching and Performance
+
+Recommend the appropriate architecture for:
+
+- Redis caching.
+- Product catalog search.
+- Keyword search.
+- Fuzzy search.
+- Elasticsearch integration where justified.
+- Database indexing.
+- Pagination.
+- Connection pooling.
+- Kafka throughput.
+- API performance.
+
+Do not introduce Elasticsearch simply because it is popular. Explain its value relative to MySQL search for our expected catalog size.
+
+## 13. Observability and Monitoring
+
+Design centralized observability.
+
+Consider:
+
+- Spring Boot Actuator.
+
+below 12 technique point will implement in the future means full implementatio completed then we will focus on this . do not implement without my approval.
+
+- Micrometer.
+- Prometheus.
+- Grafana.
+- Loki.
+- OpenTelemetry.
+- Distributed tracing.
+- Centralized logging.
+- Kafka consumer lag monitoring.
+- Database monitoring.
+- Application health checks.
+- Business-level metrics.
+- Alerting.
+
+Explain how to troubleshoot a business transaction across multiple microservices.
+
+## 14. Testing Strategy
+
+Provide a complete testing strategy:
+
+- Unit testing.
+- Integration testing.
+
+below 9 testing technique will implement in the future means full implementatio completed then we will focus on this . do not implement without my approval.
+- API testing.
+- Database testing.
+- Kafka integration testing.
+- Contract testing.
+- End-to-end testing.
+- Security testing.
+- Performance testing.
+- AI tool execution testing.
+- Human approval workflow testing.
+
+Recommend appropriate Java and React testing tools.
+
+## 15. DevOps and Deployment Strategy
+
+Design the deployment architecture for:
+
+- Local development using Docker Compose.
+
+below 13 technique points  will implement in the future means full implementatio completed then we will focus on this . do not implement without my approval.
+
+- Containerized Spring Boot applications.
+- Containerized React application.
+- AWS deployment.
+- CI/CD using Jenkins.
+- Docker image creation.
+- Image vulnerability scanning.
+- Amazon ECR.
+- AWS ECS Fargate initially, with a clear path to Kubernetes if justified.
+- Environment-specific configurations.
+- Secrets management.
+- Database migrations.
+- Blue-green or canary deployments where appropriate.
+- Rollback strategy.
+
+Every microservice must be independently buildable and deployable.
+
+## 16. Project Folder Structure
+
+Provide a clean project structure.
+
+All Spring Boot microservices must be independent applications.
+
+Do not use Maven multi-module architecture.
+
+Each microservice should have its own:
+
+- pom.xml.
+- Application entry point.
+- Configuration.
+- Controller.
+- DTO.
+- Entity.
+- Repository.
+- Service.
+- Mapper.
+- Exception handling.
+- Database migration scripts.
+- Tests.
+- Dockerfile.
+- README documentation.
+
+React should have a separate frontend project.
+
+Provide the complete proposed directory structure before implementation.
+
+## 17. Implementation Roadmap
+
+Divide the implementation into manageable phases.
+
+Suggested phases:
+
+Phase 1: Architecture and infrastructure foundation.
+
+Phase 2: Identity and stakeholder management.
+
+Phase 3: Product catalog and vendor management.
+
+Phase 4: Inventory and pricing.
+
+Phase 5: Customer experience and cart.
+
+Phase 6: Order and payment workflows.
+
+Phase 7: Restaurant operations.
+
+Phase 8: Delivery management.
+
+Phase 9: Kafka-based event-driven communication.
+
+Phase 10: Real-time frontend updates.
+
+Phase 11: Agentic AI and human approval workflows.
+
+Phase 12: Observability, testing and performance optimization.
+
+Phase 13: CI/CD and AWS deployment.
+
+For every phase, provide:
+
+- Objectives.
+- Microservices involved.
+- Database design.
+- REST APIs.
+- Kafka topics and events.
+- Frontend functionality.
+- Dependencies.
+- Acceptance criteria.
+- Testing strategy.
+
+Identify the minimum viable product and the features that can be postponed.
+
+## 18. Architecture Documentation
+
+Create architecture documentation containing:
+
+1. High-level architecture diagram.
+2. Microservices interaction diagram.
+3. Stakeholder interaction diagram.
+4. Database ownership diagram.
+5. Kafka event-flow diagram.
+6. Order Saga workflow diagram.
+7. Real-time notification diagram.
+8. Agentic AI architecture diagram.
+9. Human approval workflow diagram.
+10. Deployment architecture diagram.
+
+Use Mermaid diagrams wherever possible.
+
+Explain every diagram in simple language.
+
+## 19. Important Architectural Rules
+
+Follow these rules throughout the project:
+
+- MySQL is the source of truth for transactional business data.
+- Each microservice owns its database.
+- Microservices must be independently deployable.
+- Never use shared database tables between services.
+- Never perform direct cross-service database access.
+- Prefer asynchronous communication for business events.
+- Use synchronous REST APIs only where an immediate response is genuinely required.
+- Use the Outbox Pattern for reliable event publishing.
+- Implement idempotency and retry handling.
+- Never allow AI agents to bypass business rules.
+- Enforce human approval on sensitive operations.
+- Keep code simple, readable and maintainable.
+- Avoid unnecessary abstractions.
+- Avoid premature optimization.
+- Do not introduce technologies without explaining their purpose.
+- Preserve existing functionality if an existing application is present.
+
+## 20. How You Must Work
+
+IMPORTANT: Do not start implementation immediately.
+
+First inspect the existing repository, if available.
+
+Then prepare a complete architecture proposal.
+
+Your first response must contain:
+
+1. Your understanding of the business requirements.
+2. Recommended architecture.
+3. Recommended microservices and their responsibilities.
+4. Database ownership strategy.
+5. Kafka event-driven architecture.
+6. Real-time communication architecture.
+7. Agentic AI and human approval architecture.
+8. React frontend architecture.
+9. Security architecture.
+10. Infrastructure and deployment architecture.
+11. Complete project directory structure.
+12. Implementation phases and priorities.
+13. Potential architectural risks and trade-offs.
+14. Recommended MVP scope.
+15. Decisions that require my confirmation.
+
+Challenge any requirements that could cause unnecessary complexity, performance problems, security risks, or distributed transaction failures.
+
+Do not generate application source code, create project files, modify existing files, install dependencies, or execute infrastructure changes during this initial planning stage.
+
+Wait for my explicit approval.
+
+After approval, implement one phase at a time.
+
+After completing each phase:
+
+- Explain the implementation.
+- List the files created or modified.
+- Provide the commands to run.
+- Explain how to test the functionality.
+- Verify the acceptance criteria.
+- Wait for my approval before moving to the next major phase.
+
+The final objective is a clean, maintainable, secure, enterprise-grade grocery platform that can evolve from an initial MVP to a system supporting millions of registered customers.

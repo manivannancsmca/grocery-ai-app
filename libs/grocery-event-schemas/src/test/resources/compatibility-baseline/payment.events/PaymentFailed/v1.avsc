@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "PaymentFailed",
+  "namespace": "com.grocery.events.payment",
+  "doc": "A payment attempt was declined. retryable = the customer can still pay (payment open, window not over). Producer: payment-service, topic payment.events, key orderId. Consumer: order-service.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "paymentId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the payment."},
+    {"name": "razorpayPaymentId", "type": "string", "doc": "Razorpay payment id of the declined attempt (pay_...)."},
+    {"name": "errorCode", "type": ["null", "string"], "default": null, "doc": "Provider error code, e.g. BAD_REQUEST_ERROR; null if not reported."},
+    {"name": "errorDescription", "type": ["null", "string"], "default": null, "doc": "Provider error description; null if not reported."},
+    {"name": "retryable", "type": "boolean", "doc": "True when the customer can still pay this order."}
+  ]
+}

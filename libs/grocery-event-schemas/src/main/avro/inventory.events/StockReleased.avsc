@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "StockReleased",
+  "namespace": "com.grocery.events.inventory",
+  "doc": "Held stock of an order was given back. Producer: inventory-service, topic inventory.events (aggregate Reservation), key orderId.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "reservationId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the released reservation."},
+    {"name": "reason", "type": "string", "doc": "Why the stock was released. One of: ORDER_CANCELLED, RESERVATION_EXPIRED."}
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "PlatformSettingChanged",
+  "namespace": "com.grocery.events.order",
+  "doc": "An admin changed one platform setting of this service (docs/api/platform-settings.md): one event per changed field of a save, written with its platform_setting_change row. Producer: order-service, topic order.events, key settingKey. reporting-service keeps it in the central audit trail.",
+  "fields": [
+    {"name": "settingKey", "type": "string", "doc": "The stored key, <area>.<field>, e.g. delivery.offersPerWave (message key)."},
+    {"name": "area", "type": "string", "doc": "The settings area, as in /api/admin/settings/{area}."},
+    {"name": "field", "type": "string", "doc": "The field's name in the settings API."},
+    {"name": "oldValue", "type": ["null", "string"], "default": null, "doc": "The stored text before the save; null = the default."},
+    {"name": "newValue", "type": ["null", "string"], "default": null, "doc": "The stored text after the save; null = reset to the default."},
+    {"name": "changedBy", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the admin who saved."},
+    {"name": "changedByName", "type": ["null", "string"], "default": null, "doc": "The admin's name (or e-mail) when they saved."},
+    {"name": "changedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the save committed (UTC); every field of one save has the same time."}
+  ]
+}

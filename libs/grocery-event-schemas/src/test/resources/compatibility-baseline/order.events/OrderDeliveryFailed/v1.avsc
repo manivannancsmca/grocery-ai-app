@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "OrderDeliveryFailed",
+  "namespace": "com.grocery.events.order",
+  "doc": "The order could not be delivered after pickup (status DELIVERY_FAILED); an admin decides on a refund. Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "partnerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery partner."},
+    {"name": "reason", "type": "string", "doc": "One of: CUSTOMER_UNREACHABLE, ADDRESS_NOT_FOUND, CUSTOMER_REFUSED, OTHER."},
+    {"name": "note", "type": ["null", "string"], "default": null, "doc": "Free-text note from the partner; null if none."},
+    {"name": "failedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the delivery failed (UTC)."}
+  ]
+}

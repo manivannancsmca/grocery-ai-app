@@ -1,0 +1,38 @@
+# Scrape targets of the job "services" when the Spring Boot services run as containers of this compose project
+# (the default, SERVICES_RUN_ON=docker). docker-compose.yml mounts the chosen file as
+# /etc/prometheus-services/targets.yml (file-based service discovery).
+# Keep in step with services-host.yml.
+- targets: ["api-gateway:9080"]   # the gateway's internal management port (its public port has no actuator)
+  labels: { service: api-gateway }
+- targets: ["identity-service:8101"]
+  labels: { service: identity-service }
+- targets: ["customer-service:8102"]
+  labels: { service: customer-service }
+- targets: ["vendor-service:8103"]
+  labels: { service: vendor-service }
+- targets: ["restaurant-service:8104"]
+  labels: { service: restaurant-service }
+- targets: ["catalog-command-service:8105"]
+  labels: { service: catalog-command-service }
+- targets: ["catalog-query-service:8106"]
+  labels: { service: catalog-query-service }
+- targets: ["inventory-service:8107"]
+  labels: { service: inventory-service }
+- targets: ["pricing-service:8108"]
+  labels: { service: pricing-service }
+- targets: ["cart-service:8109"]
+  labels: { service: cart-service }
+- targets: ["order-service:8110"]
+  labels: { service: order-service }
+- targets: ["payment-service:8111"]
+  labels: { service: payment-service }
+- targets: ["delivery-service:8112"]
+  labels: { service: delivery-service }
+- targets: ["notification-service:8113", "notification-service-2:8113"]
+  labels: { service: notification-service }
+- targets: ["review-service:8114"]
+  labels: { service: review-service }
+- targets: ["ai-orchestrator-service:8115"]
+  labels: { service: ai-orchestrator-service }
+- targets: ["reporting-service:8116"]
+  labels: { service: reporting-service }

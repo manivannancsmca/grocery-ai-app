@@ -1,0 +1,38 @@
+# Build output
+**/target/
+**/dist/
+**/coverage/
+**/node_modules/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store
+
+# Local secrets / overrides (copy from .env.example)
+.env
+infrastructure/local/.env
+
+# Database exports (infrastructure/local/db-backup): personal data, never committed
+infrastructure/local/backups/
+
+# Logs
+*.log
+
+# Terraform working directories and state (state can hold secrets; it lives in the S3 backend)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Python bytecode (CI helper scripts)
+__pycache__/
+*.pyc
+
+# Generated scan reports (CI produces them as build artifacts)
+tests/security/reports/
+
+# Local Claude Code settings
+.claude/settings.local.json

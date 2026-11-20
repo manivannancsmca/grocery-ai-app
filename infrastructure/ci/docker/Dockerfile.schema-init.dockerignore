@@ -1,0 +1,5 @@
+# Build context of Dockerfile.schema-init = repository root (BuildKit uses this file instead of the root
+# .dockerignore, which excludes infrastructure/). Only what the Dockerfile copies is sent.
+*
+!libs/grocery-event-schemas/src/main/avro/
+!infrastructure/local/schema-registry/register-schemas.sh

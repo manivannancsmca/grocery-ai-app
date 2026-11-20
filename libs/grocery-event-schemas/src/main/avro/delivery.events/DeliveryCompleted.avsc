@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "DeliveryCompleted",
+  "namespace": "com.grocery.events.delivery",
+  "doc": "The partner handed the order to the customer; order-service moves the order to DELIVERED. Producer: delivery-service, topic delivery.events, key orderId (outbox aggregate type Delivery).",
+  "fields": [
+    {"name": "deliveryId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery."},
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "partnerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery partner (= the partner's user id)."},
+    {"name": "deliveredAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order was delivered (UTC)."}
+  ]
+}

@@ -1,0 +1,56 @@
+# ZAP scan rules for tests/security/zap-baseline.sh and zap-api.sh — tab-separated: <rule id> <action> <rule name>
+# Actions: IGNORE (accepted, reason above the line), INFO, WARN (default for rules not listed), FAIL (exit code 1).
+# Every IGNORE/INFO needs a reason and the date. Triage of 2026-11-13 (frontend = Vite dev server, gateway = docker).
+
+# --- High-risk classes fail the pipeline ----------------------------------------------------------------------------
+40018	FAIL	(SQL Injection)
+40012	FAIL	(Cross Site Scripting (Reflected))
+40014	FAIL	(Cross Site Scripting (Persistent))
+90020	FAIL	(Remote OS Command Injection)
+6	FAIL	(Path Traversal)
+7	FAIL	(Remote File Inclusion)
+90019	FAIL	(Server Side Code Injection)
+40009	FAIL	(Server Side Include)
+90023	FAIL	(XML External Entity Attack)
+40046	FAIL	(Server Side Request Forgery)
+
+# 40018 on POST /api/auth/login (password), 2026-11-13: FALSE POSITIVE. The boolean pair "' AND '1'='1' --" /
+# "' AND '1'='2' --" got different answers only because the scan's failed logins tripped identity-service's account
+# lockout (UserAccount.lockedUntil): after it even the correct password answers 401 "temporarily locked", while the
+# first, un-injected request had answered 200. Passwords are BCrypt-checked in Java after a JPA lookup by e-mail (no
+# native SQL). Verified by hand with curl. SQL injection still FAILs on every other URL.
+40018	OUTOFSCOPE	.*/api/auth/login.*
+
+# --- Kept as WARN on purpose (not accepted: fix them where the production frontend is served, Phase 14) -----------
+# 10038 CSP header not set, 10020 anti-clickjacking header missing, 10021 X-Content-Type-Options missing,
+# 10063 Permissions-Policy not set — on the frontend. The Vite dev server sends no security headers; the gateway sends
+# X-Frame-Options/X-Content-Type-Options/Referrer-Policy already. The built frontend (CloudFront/nginx) must add
+# Content-Security-Policy (frame-ancestors 'none'), X-Content-Type-Options, Permissions-Policy.
+10038	WARN	(Content Security Policy (CSP) Header Not Set)
+10020	WARN	(Missing Anti-clickjacking Header)
+10021	WARN	(X-Content-Type-Options Header Missing)
+10063	WARN	(Permissions Policy Header Not Set)
+
+# --- Accepted -------------------------------------------------------------------------------------------------------
+# 90004 COEP/COOP/CORP missing: cross-origin isolation is not wanted — the SPA embeds OpenStreetMap tiles and the
+# Razorpay checkout script, which `Cross-Origin-Embedder-Policy: require-corp` would block. Low. 2026-11-13.
+90004	INFO	(Insufficient Site Isolation Against Spectre Vulnerability)
+# 10096 Timestamp disclosure: the "timestamps" are epoch-ms fields and numeric ids in API payloads (e.g. iat_ms,
+# order times) that the client is meant to read. False positive. 2026-11-13.
+10096	IGNORE	(Timestamp Disclosure - Unix)
+# 10024 "token" in URL: http://<frontend>/?token=… is the Vite dev server's HMR websocket token (dev only, not a
+# credential of the platform; a production build has no HMR). 2026-11-13.
+10024	IGNORE	(Information Disclosure - Sensitive Information in URL)
+# 10027 suspicious comments: comments in the unminified modules the Vite dev server serves (/src/**, /@react-refresh);
+# a production build strips them. 2026-11-13.
+10027	IGNORE	(Information Disclosure - Suspicious Comments)
+# 10109 modern web application / 10049 cache directives: informational. API responses are `no-store` (correct); the
+# dev server's dependency bundles are cacheable (correct). 2026-11-13.
+10109	IGNORE	(Modern Web Application)
+10049	IGNORE	(Storable and Cacheable Content)
+# 100000 4xx answers / 10111 authentication request / 10112 session management response: informational — the API
+# scan sends unauthorised and malformed requests on purpose and the API answers 400/401/403/404/409/422 ProblemDetails
+# without stack traces (rule 90022 Application Error Disclosure passed). 2026-11-13.
+100000	IGNORE	(A Client Error response code was returned by the server)
+10111	IGNORE	(Authentication Request Identified)
+10112	IGNORE	(Session Management Response Identified)

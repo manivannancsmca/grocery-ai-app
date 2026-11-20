@@ -1,0 +1,19 @@
+# Run from the IDE while everything else runs in Docker:
+#   docker compose stop cart-service   (in infrastructure/local), then run CartServiceApplication with profile
+#   "local": Redis on localhost:6379, Kafka on localhost:9092, identity JWKS on localhost:8101 and the published
+#   host ports below.
+grocery:
+  cart:
+    services:
+      pricing: http://localhost:8108
+      inventory: http://localhost:8107
+      catalog-query: http://localhost:8106
+      vendor: http://localhost:8103
+      restaurant: http://localhost:8104
+      customer: http://localhost:8102
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.grocery: DEBUG

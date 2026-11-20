@@ -1,0 +1,100 @@
+# =====================================================================================
+# Prometheus — local observability stack (compose profile "observability", Phase 13).
+# Scrapes every Spring service at /actuator/prometheus (grocery-common 0.9.0), the infrastructure exporters and the
+# observability components themselves; evaluates alerts.yml and sends alerts to Alertmanager (→ Mailpit).
+# Reload after editing:  curl -X POST http://localhost:9090/-/reload
+# Validate:              infrastructure/local/observability/validate.sh
+# =====================================================================================
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # ------------------------------------------------------------------ Spring services
+  # A fixed list of targets on purpose (files, not Docker discovery): a stopped service stays in the list as DOWN
+  # (ServiceDown), it does not vanish.
+  # The target label "service" equals spring.application.name, which is also the "service" tag the services put on
+  # every meter. honor_labels: the meters carry their own common tags (grocery-common 0.9.0 / the gateway's
+  # management.metrics.tags): "service", "env" and "instance" (= HOSTNAME, the container id). They are kept as sent
+  # instead of being renamed exported_*; series without them (and the synthetic "up", "scrape_*") keep the target
+  # labels (instance = container:port). Both notification replicas share service="notification-service".
+  - job_name: services
+    honor_labels: true
+    metrics_path: /actuator/prometheus
+    # Where the Spring Boot services run decides the addresses: in Docker (targets/services-docker.yml, the default)
+    # or on this machine with host-run/start-all.cmd (targets/services-host.yml). docker-compose.yml mounts the one
+    # chosen by SERVICES_RUN_ON (docker | host, set in infrastructure/local/.env) at this path.
+    file_sd_configs:
+      - files: [/etc/prometheus-services/targets.yml]
+    metric_relabel_configs:
+      # With honor_labels nothing is renamed exported_* any more; kept as a safety net should it be switched off.
+      - action: labeldrop
+        regex: exported_(service|instance|job)
+      # Kafka client metrics per partition and per broker node are high-cardinality and unused by the dashboards
+      # (consumer lag comes from kafka-exporter).
+      - source_labels: [__name__, partition]
+        regex: "kafka_(consumer|producer|admin)_.+;.+"
+        action: drop
+      - source_labels: [__name__]
+        regex: "kafka_(consumer|producer|admin)_(node|app_info|kafka_metrics|admin_client)_.+"
+        action: drop
+
+  # ------------------------------------------------------------------ infrastructure exporters
+  - job_name: kafka                       # consumer lag, offsets per topic/partition (DLT sizes)
+    static_configs:
+      - targets: ["kafka-exporter:9308"]
+
+  - job_name: kafka-connect               # Debezium / Kafka Connect over remote JMX: connector & task state, lag
+    scrape_interval: 30s
+    scrape_timeout: 20s
+    static_configs:
+      - targets: ["kafka-connect-jmx-exporter:9404"]
+
+  - job_name: mysql
+    static_configs:
+      - targets: ["mysqld-exporter:9104"]
+
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  - job_name: elasticsearch
+    scrape_timeout: 14s
+    static_configs:
+      - targets: ["elasticsearch-exporter:9114"]
+
+  # ------------------------------------------------------------------ the observability stack itself
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  - job_name: observability               # health and throughput only (their full metric sets are large)
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["grafana:3000"]
+        labels: { component: grafana }
+      - targets: ["loki:3100"]
+        labels: { component: loki }
+      - targets: ["tempo:3200"]
+        labels: { component: tempo }
+      - targets: ["alloy:12345"]
+        labels: { component: alloy }
+      - targets: ["otel-collector:8888"]
+        labels: { component: otel-collector }
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "up|process_resident_memory_bytes|go_memstats_heap_inuse_bytes|loki_distributor_(lines|bytes)_received_total|loki_ingester_memory_streams|loki_discarded_samples_total|tempo_distributor_spans_received_total|tempo_discarded_spans_total|tempo_ingester_live_traces|otelcol_receiver_(accepted|refused)_spans(_total)?|otelcol_exporter_(sent|send_failed)_spans(_total)?|loki_write_(sent|dropped)_entries_total|loki_source_docker_target_entries_total|grafana_build_info|alloy_build_info"
+        action: keep

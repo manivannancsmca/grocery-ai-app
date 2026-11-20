@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "OrderDelivered",
+  "namespace": "com.grocery.events.order",
+  "doc": "The order was delivered (status DELIVERED). Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "partnerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery partner."},
+    {"name": "deliveredAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order was delivered (UTC)."}
+  ]
+}

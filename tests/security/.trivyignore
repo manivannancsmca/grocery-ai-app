@@ -1,0 +1,40 @@
+# Accepted Trivy findings (filesystem, image and configuration scans). One id per line with `exp:YYYY-MM-DD`: after
+# that date Trivy reports the finding again and it has to be re-reviewed. Every entry: why, where, what would fix it.
+# Fixable dependency vulnerabilities are NOT accepted here — they are fixed in the build (see the Phase 13 report).
+
+# --- configuration (trivy-config.sh) --------------------------------------------------------------------------------
+
+# AWS-0104 (CRITICAL by Trivy's rating) — infrastructure/aws/terraform/modules/ecs-cluster/main.tf
+# `tasks_internet` egress 0.0.0.0/0, but only on the listed ports (443, 587) and only through the NAT gateway: the
+# services call SaaS endpoints without fixed IP ranges (Razorpay API, SMTP relay, the external model endpoint, public
+# images). Revisit with VPC endpoints for AWS APIs and an egress proxy/allow-list (Phase 14 owner). Accepted 2026-11-13.
+AWS-0104 exp:2027-02-13
+
+# GROCERY-COMPOSE-003 (HIGH) — infrastructure/local/docker-compose.yml, service `alloy` (observability profile)
+# Grafana Alloy discovers the containers and reads their logs through the Docker socket. `:ro` does NOT make the Docker
+# API read-only, so this is root on the laptop for whoever controls Alloy. Accepted for the LOCAL profile only (never
+# in AWS, where logs go to CloudWatch). Better: a docker-socket-proxy allowing only GET /containers and /events, or
+# reading /var/lib/docker/containers/*/*.log. Accepted 2026-11-13.
+GROCERY-COMPOSE-003 exp:2027-02-13
+
+# DS-0026 (LOW) — "No HEALTHCHECK defined" in every Dockerfile. The health checks live where the containers run:
+# docker-compose.yml (`healthcheck:` per service) and the ECS task definitions (Phase 14), both against
+# /actuator/health. Accepted 2026-11-13.
+DS-0026 exp:2027-05-13
+
+# --- images (trivy-images.sh) ---------------------------------------------------------------------------------------
+
+# grocery/grocery-web:dev — HIGH CVEs in the npm CLI's own bundled packages of the base image node:24.22.2-alpine3.23
+# (/usr/local/lib/node_modules/npm/node_modules/{brace-expansion 5.0.9, undici 6.28.0}). This is the Vite dev-server
+# image: it runs only on developer machines, npm runs only at build time, and production serves the built static
+# files (Phase 14). Fix: move FROM to a node 24 image whose bundled npm has brace-expansion ≥ 5.0.11 and
+# undici ≥ 6.29.1 (or `npm install -g npm@<that version>` in the Dockerfile). Accepted 2026-11-13.
+CVE-2026-102276 exp:2027-01-13
+CVE-2026-102278 exp:2027-01-13
+CVE-2026-109383 exp:2027-01-13
+CVE-2026-109869 exp:2027-01-13
+CVE-2026-19534 exp:2027-01-13
+CVE-2026-87018 exp:2027-01-13
+
+# NOT accepted (fix in the build, see the Phase 13 report): guava 32.0.1-jre (CVE-2026-102554), lz4-java 1.11.2
+# (CVE-2026-106451), snappy-java 1.1.10.7 (CVE-2026-108106, CVE-2026-93451) in every Kafka-using service image.

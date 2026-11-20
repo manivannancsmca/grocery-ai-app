@@ -1,0 +1,1177 @@
+{
+  "consumer": {
+    "name": "order-service"
+  },
+  "interactions": [
+    {
+      "description": "a checkout preview for the default address",
+      "key": "74f002e8",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "a grocery cart ready for checkout at the customer's default address",
+          "params": {
+            "addressId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/api/cart/preview"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "address": {
+              "city": "Bengaluru",
+              "id": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+              "label": "Home",
+              "landmark": "Near the metro station",
+              "latitude": 12.9784,
+              "line1": "12, 4th Cross, HAL 2nd Stage",
+              "line2": "Indiranagar",
+              "longitude": 77.6408,
+              "phone": "+919800000001",
+              "postalCode": "560038",
+              "recipientName": "Asha Rao",
+              "state": "Karnataka"
+            },
+            "canCheckout": true,
+            "currency": "INR",
+            "delivery": {
+              "distanceKm": 1.20,
+              "fee": 25.00
+            },
+            "issues": [
+
+            ],
+            "itemCount": 4,
+            "lines": [
+              {
+                "foodType": "VEG",
+                "imageUrl": "https://cdn.grocery.local/products/amul-taaza-1l.jpg",
+                "itemId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c1",
+                "lineTotal": 360.00,
+                "mrp": 100.00,
+                "name": "Amul Taaza Toned Milk 1 L",
+                "quantity": 4,
+                "type": "PRODUCT",
+                "unitLabel": "1 L",
+                "unitPrice": 90.00
+              }
+            ],
+            "mrpTotal": 400.00,
+            "savings": 40.00,
+            "store": {
+              "city": "Bengaluru",
+              "id": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1",
+              "latitude": 12.9719,
+              "longitude": 77.6412,
+              "name": "FreshMart Indiranagar",
+              "type": "GROCERY"
+            },
+            "subtotal": 360.00,
+            "total": 385.00,
+            "updatedAt": "2026-11-14T09:30:00.123Z"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.address.city": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.address.label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.landmark": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.latitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.address.line1": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.line2": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.longitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.address.phone": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.postalCode": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.recipientName": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.state": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.currency": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.delivery.distanceKm": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.delivery.fee": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.itemCount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.lines": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].foodType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].imageUrl": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].itemId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.lines[*].lineTotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.lines[*].mrp": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.lines[*].name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].quantity": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.lines[*].type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "PRODUCT|MENU_ITEM"
+                }
+              ]
+            },
+            "$.lines[*].unitLabel": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].unitPrice": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.mrpTotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.savings": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.store.city": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.store.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.store.latitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.store.longitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.store.name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.store.type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "GROCERY|RESTAURANT"
+                }
+              ]
+            },
+            "$.subtotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.total": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.updatedAt": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a checkout preview for one of the customer's addresses, with a coupon",
+      "key": "a6f21ebb",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "a grocery cart ready for checkout, with coupon SAVE10 applied",
+          "params": {
+            "addressId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/api/cart/preview",
+        "query": {
+          "addressId": [
+            "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1"
+          ]
+        }
+      },
+      "response": {
+        "body": {
+          "content": {
+            "address": {
+              "city": "Bengaluru",
+              "id": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+              "label": "Home",
+              "landmark": "Near the metro station",
+              "latitude": 12.9784,
+              "line1": "12, 4th Cross, HAL 2nd Stage",
+              "line2": "Indiranagar",
+              "longitude": 77.6408,
+              "phone": "+919800000001",
+              "postalCode": "560038",
+              "recipientName": "Asha Rao",
+              "state": "Karnataka"
+            },
+            "canCheckout": true,
+            "coupon": {
+              "code": "SAVE10",
+              "deliveryFeeDiscount": 0.00,
+              "discount": 36.00,
+              "valid": true
+            },
+            "currency": "INR",
+            "delivery": {
+              "distanceKm": 1.20,
+              "fee": 25.00
+            },
+            "deliveryFeeDiscount": 0.00,
+            "discount": 36.00,
+            "issues": [
+
+            ],
+            "itemCount": 4,
+            "lines": [
+              {
+                "foodType": "VEG",
+                "imageUrl": "https://cdn.grocery.local/products/amul-taaza-1l.jpg",
+                "itemId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c1",
+                "lineTotal": 360.00,
+                "mrp": 100.00,
+                "name": "Amul Taaza Toned Milk 1 L",
+                "quantity": 4,
+                "type": "PRODUCT",
+                "unitLabel": "1 L",
+                "unitPrice": 90.00
+              }
+            ],
+            "mrpTotal": 400.00,
+            "savings": 40.00,
+            "store": {
+              "city": "Bengaluru",
+              "id": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1",
+              "latitude": 12.9719,
+              "longitude": 77.6412,
+              "name": "FreshMart Indiranagar",
+              "type": "GROCERY"
+            },
+            "subtotal": 360.00,
+            "total": 349.00,
+            "updatedAt": "2026-11-14T09:30:00.123Z"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.address.city": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.address.label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.landmark": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.latitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.address.line1": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.line2": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.longitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.address.phone": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.postalCode": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.recipientName": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.address.state": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.coupon.deliveryFeeDiscount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.coupon.discount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.currency": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.delivery.distanceKm": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.delivery.fee": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.deliveryFeeDiscount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.discount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.itemCount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.lines": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].foodType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].imageUrl": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].itemId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.lines[*].lineTotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.lines[*].mrp": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.lines[*].name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].quantity": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.lines[*].type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "PRODUCT|MENU_ITEM"
+                }
+              ]
+            },
+            "$.lines[*].unitLabel": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.lines[*].unitPrice": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.mrpTotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.savings": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.store.city": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.store.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.store.latitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.store.longitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.store.name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.store.type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "GROCERY|RESTAURANT"
+                }
+              ]
+            },
+            "$.subtotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.total": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.updatedAt": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a checkout preview with a blocking issue",
+      "key": "ee6cbd41",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "a grocery cart with an item that went out of stock",
+          "params": {
+            "addressId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601",
+            "productId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c1"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/api/cart/preview",
+        "query": {
+          "addressId": [
+            "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1"
+          ]
+        }
+      },
+      "response": {
+        "body": {
+          "content": {
+            "canCheckout": false,
+            "issues": [
+              {
+                "blocking": true,
+                "code": "OUT_OF_STOCK",
+                "itemId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c1",
+                "message": "Amul Taaza Toned Milk 1 L is out of stock"
+              }
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.issues": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.issues[*].code": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.issues[*].itemId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.issues[*].message": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a checkout preview while cart-service cannot reach customer-service",
+      "key": "f9d0a7c1",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "customer-service is unavailable",
+          "params": {
+            "addressId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/api/cart/preview",
+        "query": {
+          "addressId": [
+            "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1"
+          ]
+        }
+      },
+      "response": {
+        "body": {
+          "content": {
+            "dependency": "customer",
+            "errorCode": "DEPENDENCY_UNAVAILABLE"
+          },
+          "contentType": "application/problem+json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/problem+json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/problem\\+json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 503
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a checkout preview for an address the customer does not have",
+      "key": "4acb9779",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the address is not one of the customer's",
+          "params": {
+            "addressId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a9",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/api/cart/preview",
+        "query": {
+          "addressId": [
+            "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a9"
+          ]
+        }
+      },
+      "response": {
+        "body": {
+          "content": {
+            "errorCode": "ADDRESS_NOT_FOUND"
+          },
+          "contentType": "application/problem+json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/problem+json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/problem\\+json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 404
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.7"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "cart-service"
+  }
+}

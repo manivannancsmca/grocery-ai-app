@@ -1,0 +1,7 @@
+// grocery-common: build and test, scan, publish to CodeArtifact (contract Phase 14 §6 "Library pipelines").
+// Services pin its version; a released version is never published twice. See infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryLibraryPipeline(
+    library: 'grocery-common'
+)

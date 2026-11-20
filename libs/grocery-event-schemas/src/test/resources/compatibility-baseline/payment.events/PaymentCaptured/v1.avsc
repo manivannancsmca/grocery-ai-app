@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "PaymentCaptured",
+  "namespace": "com.grocery.events.payment",
+  "doc": "The payment was captured. late = true when the payment had already expired or been cancelled; a full LATE_CAPTURE refund was started automatically. Producer: payment-service, topic payment.events, key orderId. Consumer: order-service.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "paymentId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the payment."},
+    {"name": "razorpayPaymentId", "type": "string", "doc": "Razorpay payment id of the captured attempt (pay_...)."},
+    {"name": "amount", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "The payment's amount, 2 decimals."},
+    {"name": "method", "type": ["null", "string"], "default": null, "doc": "Payment method reported by Razorpay, e.g. card, upi, netbanking, wallet; null if not reported."},
+    {"name": "capturedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the capture was recorded (UTC)."},
+    {"name": "late", "type": "boolean", "doc": "True when captured after the payment expired or was cancelled (refunded automatically)."}
+  ]
+}

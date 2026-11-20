@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "UserSuspended",
+  "namespace": "com.grocery.events.identity",
+  "doc": "An admin suspended a user account; its sessions and tokens were revoked. Producer: identity-service, topic identity.events, key userId.",
+  "fields": [
+    {"name": "userId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the suspended user."},
+    {"name": "reason", "type": "string", "doc": "Reason given by the admin (required by the API, at most 500 characters)."},
+    {"name": "suspendedBy", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the admin who suspended the account."}
+  ]
+}

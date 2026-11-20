@@ -1,0 +1,47 @@
+{
+  "type": "record",
+  "name": "ProductUpserted",
+  "namespace": "com.grocery.events.catalog",
+  "doc": "The complete product snapshot, published on every change (create, edit, publish, unpublish, archive), on re-snapshots caused by category or vendor changes, and on republish. Archiving is a ProductUpserted with status ARCHIVED. Producer: catalog-command-service, topic catalog.events, key productId. productVersion is the search index's external version.",
+  "fields": [
+    {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product (aggregate id and message key)."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that sells the product."},
+    {"name": "vendorName", "type": ["null", "string"], "default": null, "doc": "The vendor's business name from catalog's vendor projection; null when the vendor is not known yet or has no name."},
+    {"name": "vendorActive", "type": "boolean", "doc": "False only when the vendor is SUSPENDED (true when the vendor is not known yet)."},
+    {"name": "name", "type": "string", "doc": "Product name."},
+    {"name": "description", "type": ["null", "string"], "default": null, "doc": "Product description; null if none."},
+    {"name": "brand", "type": ["null", {
+      "type": "record",
+      "name": "ProductUpsertedIdName",
+      "doc": "An id with its display name (brand or category).",
+      "fields": [
+        {"name": "id", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the brand or category."},
+        {"name": "name", "type": "string", "doc": "Display name of the brand or category."}
+      ]
+    }], "default": null, "doc": "The product's brand; null if none."},
+    {"name": "category", "type": ["null", "ProductUpsertedIdName"], "default": null, "doc": "The product's (leaf) category; null when the product has no existing category."},
+    {"name": "categoryPath", "type": {"type": "array", "items": "ProductUpsertedIdName"}, "doc": "Category path from the root to the leaf category; empty when the product has no category."},
+    {"name": "categoryActive", "type": "boolean", "doc": "True when the category and all its parents are active (false without a category)."},
+    {"name": "unitValue", "type": {"type": "bytes", "logicalType": "decimal", "precision": 10, "scale": 3}, "doc": "Pack size value, e.g. 500 for 500 g (column DECIMAL(10,3); the JSON payload strips trailing zeros)."},
+    {"name": "unitOfMeasure", "type": "string", "doc": "Pack size unit. One of: G, KG, ML, L, PCS, PACK."},
+    {"name": "unitLabel", "type": "string", "doc": "Pack size label shown to customers, e.g. 500 g, 1.5 kg, 6 pcs."},
+    {"name": "sku", "type": ["null", "string"], "default": null, "doc": "Vendor's stock keeping unit; null if none."},
+    {"name": "barcode", "type": ["null", "string"], "default": null, "doc": "Barcode (EAN/UPC, up to 14 digits); null if none."},
+    {"name": "foodType", "type": ["null", "string"], "default": null, "doc": "Food type. One of: VEG, NON_VEG, EGG; null for non-food products."},
+    {"name": "tags", "type": {"type": "array", "items": "string"}, "doc": "Search tags in the vendor's order; may be empty."},
+    {"name": "attributes", "type": {"type": "array", "items": {
+      "type": "record",
+      "name": "ProductUpsertedAttribute",
+      "doc": "A free-text product attribute, e.g. Shelf life = 6 months.",
+      "fields": [
+        {"name": "name", "type": "string", "doc": "Attribute name."},
+        {"name": "value", "type": "string", "doc": "Attribute value."}
+      ]
+    }}, "doc": "Product attributes in the vendor's order; may be empty."},
+    {"name": "imageUrls", "type": {"type": "array", "items": "string"}, "doc": "Image URLs in display order; may be empty."},
+    {"name": "status", "type": "string", "doc": "Product status. One of: DRAFT, PUBLISHED, UNPUBLISHED, ARCHIVED."},
+    {"name": "publishedAt", "type": ["null", {"type": "long", "logicalType": "timestamp-micros"}], "default": null, "doc": "When the product was first published (UTC); null if never published."},
+    {"name": "updatedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the product itself was last changed (UTC)."},
+    {"name": "productVersion", "type": "long", "doc": "Strictly increasing per product with every snapshot change; a republish re-sends the current version unchanged."}
+  ]
+}

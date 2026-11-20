@@ -1,0 +1,90 @@
+{
+  "type": "record",
+  "name": "GoodsReceived",
+  "namespace": "com.grocery.events.vendor",
+  "doc": "A vendor recorded goods received against a purchase order; inventory-service adds the quantities to stock. Producer: vendor-service, topic vendor.events, key vendorId.",
+  "fields": [
+    {
+      "name": "vendorId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the vendor (message key)."
+    },
+    {
+      "name": "purchaseOrderId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the purchase order."
+    },
+    {
+      "name": "purchaseOrderNumber",
+      "type": "string",
+      "doc": "Human-readable purchase order number, e.g. PO-7K3M9QX2."
+    },
+    {
+      "name": "receiptId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of this goods receipt; one purchase order can have several."
+    },
+    {
+      "name": "supplierId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the vendor's supplier."
+    },
+    {
+      "name": "lines",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "GoodsReceivedLine",
+          "doc": "A received product line.",
+          "fields": [
+            {
+              "name": "productId",
+              "type": {
+                "type": "string",
+                "logicalType": "uuid"
+              },
+              "doc": "The vendor's product."
+            },
+            {
+              "name": "quantity",
+              "type": "int",
+              "doc": "Units received now (positive)."
+            },
+            {
+              "name": "unitCost",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              },
+              "doc": "Purchase cost per unit, 2 decimals."
+            }
+          ]
+        }
+      },
+      "doc": "What was received."
+    },
+    {
+      "name": "receivedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When the goods were received (UTC)."
+    }
+  ]
+}

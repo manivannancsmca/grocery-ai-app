@@ -1,0 +1,219 @@
+{
+  "consumer": {
+    "name": "cart-service"
+  },
+  "interactions": [
+    {
+      "description": "a lookup of a visible and a not visible product",
+      "key": "db8eeb37",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "one product is visible and another is not",
+          "params": {
+            "missingProductId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c9",
+            "productId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c1",
+            "vendorId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1"
+          }
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "productIds": [
+              "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c1",
+              "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c9"
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.productIds[0]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.productIds[1]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            },
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/internal/catalog/products/lookup"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "items": [
+              {
+                "foodType": "VEG",
+                "id": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c1",
+                "name": "Amul Taaza Toned Milk 1 L",
+                "primaryImageUrl": "https://cdn.grocery.local/products/amul-taaza-1l.jpg",
+                "unitLabel": "1 L",
+                "vendor": {
+                  "id": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1",
+                  "name": "FreshMart Indiranagar"
+                }
+              }
+            ],
+            "missing": [
+              "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6c9"
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.items": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].foodType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.items[*].name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].primaryImageUrl": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].unitLabel": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].vendor.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.items[*].vendor.name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.missing[0]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.7"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "catalog-query-service"
+  }
+}

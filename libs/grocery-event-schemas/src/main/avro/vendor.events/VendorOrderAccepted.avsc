@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "VendorOrderAccepted",
+  "namespace": "com.grocery.events.vendor",
+  "doc": "The vendor accepted the order. Producer: vendor-service, topic vendor.events, key orderId (outbox aggregate type VendorOrder).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that received the order."},
+    {"name": "readyInMinutes", "type": "int", "doc": "The vendor's estimate of minutes until the order is ready for pickup."},
+    {"name": "readyBy", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "acceptedAt plus readyInMinutes (UTC)."},
+    {"name": "acceptedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order was accepted (UTC)."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User id of the vendor user who accepted."}
+  ]
+}

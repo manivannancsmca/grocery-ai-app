@@ -1,0 +1,15 @@
+# Active inside Docker Compose (SPRING_PROFILES_ACTIVE=docker). Service URLs come from env vars.
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://identity-service:8101/.well-known/jwks.json}
+
+logging:
+  structured:
+    format:
+      console: ecs

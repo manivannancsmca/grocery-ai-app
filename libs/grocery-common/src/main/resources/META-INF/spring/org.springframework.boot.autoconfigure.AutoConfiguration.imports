@@ -1,0 +1,9 @@
+com.grocery.common.autoconfigure.GroceryCommonAutoConfiguration
+com.grocery.common.autoconfigure.GrocerySecurityAutoConfiguration
+com.grocery.common.autoconfigure.GroceryAvroAutoConfiguration
+com.grocery.common.autoconfigure.GroceryKafkaAutoConfiguration
+com.grocery.common.autoconfigure.GroceryDeadLetterAutoConfiguration
+com.grocery.common.autoconfigure.GroceryHousekeepingAutoConfiguration
+com.grocery.common.autoconfigure.GroceryApprovalAutoConfiguration
+com.grocery.common.autoconfigure.GroceryObservabilityAutoConfiguration
+com.grocery.common.autoconfigure.GroceryExportAutoConfiguration

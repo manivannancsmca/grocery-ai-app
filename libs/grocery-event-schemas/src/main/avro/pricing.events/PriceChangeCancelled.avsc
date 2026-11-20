@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "PriceChangeCancelled",
+  "namespace": "com.grocery.events.pricing",
+  "doc": "A pending price change request was cancelled: by the vendor, or automatically because the product was archived. Producer: pricing-service, topic pricing.events, key productId.",
+  "fields": [
+    {"name": "requestId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the price change request."},
+    {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product (message key)."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that requested the change."},
+    {"name": "cancelledBy", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User id of the vendor user who cancelled; null for an automatic cancellation (product archived)."},
+    {"name": "reason", "type": "string", "doc": "Why it was cancelled, e.g. Cancelled by vendor or Product archived."}
+  ]
+}

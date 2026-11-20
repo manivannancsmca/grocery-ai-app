@@ -1,0 +1,52 @@
+set -euo pipefail
+umask 077
+# db-init (rendered by modules/platform): the AWS counterpart of infrastructure/local/mysql/init/*.sql.
+# Credentials arrive as environment variables injected from Secrets Manager; nothing secret is in this script.
+# Idempotent: CREATE ... IF NOT EXISTS, then ALTER USER so a rotated secret is applied on the next run.
+cat > /tmp/client.cnf <<EOF
+[client]
+host=${db_host}
+port=${db_port}
+user=$MYSQL_MASTER_USERNAME
+password=$MYSQL_MASTER_PASSWORD
+ssl-mode=REQUIRED
+EOF
+sql() { mysql --defaults-extra-file=/tmp/client.cnf --batch; }
+
+echo "Waiting for MySQL at ${db_host}:${db_port} ..."
+until echo "SELECT 1" | sql >/dev/null 2>&1; do sleep 5; done
+
+# One database and one least-privilege user per service: <database> <user> <variable holding the password>
+while read -r db user var; do
+  [ -n "$db" ] || continue
+  pw="$${!var}"
+  echo "database $db, user $user"
+  sql <<SQL
+CREATE DATABASE IF NOT EXISTS $db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER IF NOT EXISTS '$user'@'%' IDENTIFIED BY '$pw' REQUIRE SSL;
+ALTER USER '$user'@'%' IDENTIFIED BY '$pw' REQUIRE SSL;
+GRANT ALL PRIVILEGES ON $db.* TO '$user'@'%';
+SQL
+done <<'LIST'
+%{ for d in databases ~}
+${d.name} ${d.user} ${d.variable}
+%{ endfor ~}
+LIST
+%{ if length(debezium_databases) > 0 ~}
+
+# Debezium (MSK Connect): binlog reader with read access to the producing services' databases only.
+echo "user debezium"
+sql <<SQL
+CREATE USER IF NOT EXISTS 'debezium'@'%' IDENTIFIED BY '$DEBEZIUM_DB_PASSWORD' REQUIRE SSL;
+ALTER USER 'debezium'@'%' IDENTIFIED BY '$DEBEZIUM_DB_PASSWORD' REQUIRE SSL;
+GRANT RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'debezium'@'%';
+SQL
+for db in ${join(" ", debezium_databases)}; do
+  echo "GRANT SELECT, LOCK TABLES ON $db.* TO 'debezium'@'%';" | sql
+done
+%{ endif ~}
+
+# Binlog retention for Debezium (not a parameter-group setting on RDS).
+echo "CALL mysql.rds_set_configuration('binlog retention hours', ${binlog_retention_hours});" | sql
+echo "FLUSH PRIVILEGES;" | sql
+echo "db-init done"

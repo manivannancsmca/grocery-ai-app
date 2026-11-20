@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "OrderAwaitingPayment",
+  "namespace": "com.grocery.events.order",
+  "doc": "The order can be paid (CREATED -> AWAITING_PAYMENT: stock reserved, or at once for a restaurant order). Producer: order-service, topic order.events, key orderId. Consumer: payment-service (creates the payment).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the paying customer."},
+    {"name": "amount", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Amount to pay (the order total), 2 decimals."},
+    {"name": "currency", "type": "string", "doc": "ISO 4217 currency code, always INR today."},
+    {"name": "expiresAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "End of the payment window (UTC)."},
+    {"name": "contactPhone", "type": ["null", "string"], "default": null, "doc": "Phone of the delivery address, used to prefill the checkout; null if none."}
+  ]
+}

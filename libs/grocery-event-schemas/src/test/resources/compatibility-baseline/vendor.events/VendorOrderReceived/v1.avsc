@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "VendorOrderReceived",
+  "namespace": "com.grocery.events.vendor",
+  "doc": "A paid grocery order reached the vendor and waits for acceptance until acceptBy; the vendor's order board shows it. Producer: vendor-service, topic vendor.events, key orderId (outbox aggregate type VendorOrder).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that received the order."},
+    {"name": "ownerUserId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the vendor owner (receives the new-order alert)."},
+    {"name": "itemCount", "type": "int", "doc": "Number of units ordered."},
+    {"name": "total", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Order total paid by the customer, INR."},
+    {"name": "acceptBy", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "Deadline for accepting; after it the order is auto-rejected (UTC)."},
+    {"name": "receivedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the vendor received the order (UTC)."}
+  ]
+}

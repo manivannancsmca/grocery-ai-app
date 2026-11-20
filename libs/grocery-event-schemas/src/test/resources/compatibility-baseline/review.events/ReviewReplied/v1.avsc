@@ -1,0 +1,61 @@
+{
+  "type": "record",
+  "name": "ReviewReplied",
+  "namespace": "com.grocery.events.review",
+  "doc": "The store (vendor or restaurant owner) replied to, or edited its reply to, a published review. Producer: review-service, topic review.events, key reviewId.",
+  "fields": [
+    {
+      "name": "reviewId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the review (message key)."
+    },
+    {
+      "name": "targetType",
+      "type": "string",
+      "doc": "What is reviewed. One of: PRODUCT, MENU_ITEM, VENDOR, RESTAURANT, DELIVERY_PARTNER."
+    },
+    {
+      "name": "targetId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the product, menu item, vendor, restaurant or delivery partner."
+    },
+    {
+      "name": "storeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "vendorId or restaurantId of the order the review comes from (the store that is notified)."
+    },
+    {
+      "name": "customerId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "The reviewing customer."
+    },
+    {
+      "name": "repliedBy",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "The store owner who replied."
+    },
+    {
+      "name": "repliedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When the reply was saved (UTC)."
+    }
+  ]
+}

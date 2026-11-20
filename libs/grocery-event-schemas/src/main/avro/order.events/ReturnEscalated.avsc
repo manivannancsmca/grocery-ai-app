@@ -1,0 +1,81 @@
+{
+  "type": "record",
+  "name": "ReturnEscalated",
+  "namespace": "com.grocery.events.order",
+  "doc": "The store did not decide a return in time; admins decide it now (status ESCALATED). Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {
+      "name": "returnId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the return request."
+    },
+    {
+      "name": "returnNumber",
+      "type": "string",
+      "doc": "Human-readable return number, e.g. RT-7K3M9QX2."
+    },
+    {
+      "name": "orderId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the order (message key)."
+    },
+    {
+      "name": "orderNumber",
+      "type": "string",
+      "doc": "Human-readable order number."
+    },
+    {
+      "name": "orderType",
+      "type": "string",
+      "doc": "Store type of the order. One of: GROCERY, RESTAURANT."
+    },
+    {
+      "name": "customerId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the customer."
+    },
+    {
+      "name": "storeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."
+    },
+    {
+      "name": "refundAmount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Total refund if approved, 2 decimals."
+    },
+    {
+      "name": "requestedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When it was requested (UTC)."
+    },
+    {
+      "name": "escalatedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When it was escalated (UTC)."
+    }
+  ]
+}

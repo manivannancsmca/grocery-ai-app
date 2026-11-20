@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "PasswordResetRequested",
+  "namespace": "com.grocery.events.identity",
+  "doc": "Someone asked for a password reset link for an active account (POST /api/auth/password/forgot). Producer: identity-service, topic identity.events, key userId. notification-service emails the link. The event carries the raw token because only it can build the link: the token works once, expires after 30 minutes, and identity_db keeps only its SHA-256 hash.",
+  "fields": [
+    {"name": "userId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the account."},
+    {"name": "email", "type": "string", "doc": "Login e-mail address of the account: the link is sent there."},
+    {"name": "fullName", "type": "string", "doc": "The account holder's name, for the greeting."},
+    {"name": "token", "type": "string", "doc": "The raw single-use reset token (32 random bytes, URL-safe base64 without padding). A secret: it only goes into the emailed link, never into logs."},
+    {"name": "expiresAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the link stops working (UTC)."}
+  ]
+}

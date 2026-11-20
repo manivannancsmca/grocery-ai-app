@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "StockReserved",
+  "namespace": "com.grocery.events.inventory",
+  "doc": "All lines of a grocery order are held until expiresAt. Producer: inventory-service, topic inventory.events (aggregate Reservation), key orderId. Consumer: order-service.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "reservationId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the stock reservation."},
+    {"name": "items", "type": {"type": "array", "items": {
+      "type": "record",
+      "name": "StockReservedLine",
+      "doc": "One reserved product (quantities of the same product are added up).",
+      "fields": [
+        {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product."},
+        {"name": "quantity", "type": "int", "doc": "Reserved quantity."}
+      ]
+    }}, "doc": "The reserved lines, one per product."},
+    {"name": "expiresAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the reservation expires unless the order is confirmed (UTC)."}
+  ]
+}

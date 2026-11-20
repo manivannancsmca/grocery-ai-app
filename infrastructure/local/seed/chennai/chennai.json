@@ -1,0 +1,2856 @@
+{
+  "_about": "Chennai test data for infrastructure/local/scripts/seed-chennai.mjs. Business and people names are made up; the places, streets and coordinates are real Chennai neighbourhoods (coordinates checked against OpenStreetMap). GSTIN and FSSAI numbers only have the right format. Every account is approved; its password is the \"password\" value below, unless the entry has its own \"password\" (the development accounts). Store products are catalog codes: PRD… from infrastructure/local/seed/catalog/products.csv, CHN… (branded) from products.csv next to this file. A store's optional \"stockScale\" multiplies the products' opening stock, and \"outOfStock\" lists the products it opens with none of.",
+  "password": "Chennai@123",
+  "development": {
+    "_about": "The sign-in screen's development accounts (identity-service creates them when DEV_SEED_ENABLED=true; their password is their own \"password\", not the shared one), one of each role, close together in Velachery, for testing the whole workflow by hand (README: \"Development accounts\"). infrastructure/local/scripts/verify-workflow.mjs runs a grocery and a restaurant order through all four.",
+    "customer": "dev-customer",
+    "vendor": "dev-vendor",
+    "restaurant": "dev-restaurant",
+    "partner": "dev-partner"
+  },
+  "restaurants": [
+    {
+      "key": "dev-restaurant",
+      "owner": {
+        "email": "dev.restaurant@grocery.local",
+        "password": "Dev@12345",
+        "fullName": "Shanthi Raghunathan",
+        "phone": "+919840066003"
+      },
+      "name": "Kaveri Meals & Tiffin",
+      "description": "Home-style tiffin, banana-leaf meals and Chettinad curries off Gandhi Road, Velachery.",
+      "cuisines": [
+        "SOUTH_INDIAN",
+        "BREAKFAST",
+        "CHETTINAD"
+      ],
+      "address": {
+        "line1": "12 Gandhi Road",
+        "line2": "Sony Nagar, Velachery",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600042",
+        "latitude": 12.986,
+        "longitude": 80.2277
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Tiffin",
+          "items": [
+            {
+              "name": "Idli (2 pcs) with Sambar",
+              "price": 50,
+              "foodType": "VEG",
+              "description": "Steamed rice cakes with sambar and coconut chutney."
+            },
+            {
+              "name": "Ghee Roast Dosa",
+              "price": 110,
+              "foodType": "VEG",
+              "description": "Crisp dosa roasted in ghee, with sambar and chutneys."
+            },
+            {
+              "name": "Masala Dosa",
+              "price": 95,
+              "foodType": "VEG",
+              "description": "Dosa filled with potato masala."
+            },
+            {
+              "name": "Ven Pongal",
+              "price": 80,
+              "foodType": "VEG",
+              "description": "Rice and moong dal with pepper, cumin and ghee."
+            },
+            {
+              "name": "Medu Vada (2 pcs)",
+              "price": 55,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Meals",
+          "items": [
+            {
+              "name": "South Indian Veg Meals",
+              "price": 150,
+              "foodType": "VEG",
+              "description": "Rice, sambar, rasam, two poriyals, kootu, appalam, curd and payasam."
+            },
+            {
+              "name": "Curd Rice",
+              "price": 80,
+              "foodType": "VEG",
+              "description": "With pomegranate and mango pickle."
+            },
+            {
+              "name": "Chicken Chettinad Curry",
+              "price": 210,
+              "foodType": "NON_VEG",
+              "description": "Peppery Chettinad gravy; order with parotta or rice."
+            },
+            {
+              "name": "Egg Kothu Parotta",
+              "price": 140,
+              "foodType": "EGG",
+              "description": "Shredded parotta tossed with egg, onion and salna."
+            }
+          ]
+        },
+        {
+          "category": "Drinks & Sweets",
+          "items": [
+            {
+              "name": "Filter Coffee",
+              "price": 30,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Rose Milk",
+              "price": 50,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Rava Kesari",
+              "price": 50,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pondy-bazaar",
+      "owner": {
+        "email": "tiffinhouse.chennai@example.com",
+        "fullName": "Raghavan Srinivasan",
+        "phone": "+919840011001"
+      },
+      "name": "Pondy Bazaar Tiffin House",
+      "description": "Crisp ghee roasts, soft idlis and strong filter coffee in the heart of T. Nagar.",
+      "cuisines": [
+        "SOUTH_INDIAN",
+        "BREAKFAST"
+      ],
+      "address": {
+        "line1": "48 Thyagaraya Road",
+        "line2": "Pondy Bazaar, T. Nagar",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600017",
+        "latitude": 13.0418,
+        "longitude": 80.2341
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Tiffin",
+          "items": [
+            {
+              "name": "Ghee Roast Dosa",
+              "price": 120,
+              "foodType": "VEG",
+              "description": "Paper-thin dosa roasted in ghee, with sambar and three chutneys"
+            },
+            {
+              "name": "Mini Idli Sambar",
+              "price": 90,
+              "foodType": "VEG",
+              "description": "14 button idlis soaked in sambar"
+            },
+            {
+              "name": "Ven Pongal",
+              "price": 85,
+              "foodType": "VEG",
+              "description": "Rice and moong dal with pepper, cumin and cashews"
+            },
+            {
+              "name": "Medu Vada (2 pcs)",
+              "price": 60,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Drinks",
+          "items": [
+            {
+              "name": "Filter Coffee",
+              "price": 35,
+              "foodType": "VEG",
+              "description": "Degree coffee in a davara set"
+            },
+            {
+              "name": "Rose Milk",
+              "price": 55,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "mylapore",
+      "owner": {
+        "email": "mylaimess.chennai@example.com",
+        "fullName": "Kamala Venkatesan",
+        "phone": "+919840011002"
+      },
+      "name": "Mylai Mess",
+      "description": "Home-style South Indian meals near the Kapaleeshwarar temple tank.",
+      "cuisines": [
+        "SOUTH_INDIAN"
+      ],
+      "address": {
+        "line1": "12 North Mada Street",
+        "line2": "Mylapore",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600004",
+        "latitude": 13.0336,
+        "longitude": 80.2697
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Meals",
+          "items": [
+            {
+              "name": "South Indian Meals",
+              "price": 180,
+              "foodType": "VEG",
+              "description": "Rice, sambar, rasam, kootu, poriyal, appalam, curd and payasam"
+            },
+            {
+              "name": "Sambar Rice",
+              "price": 100,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Curd Rice",
+              "price": 90,
+              "foodType": "VEG",
+              "description": "With pomegranate and mango pickle"
+            }
+          ]
+        },
+        {
+          "category": "Sweets",
+          "items": [
+            {
+              "name": "Rava Kesari",
+              "price": 50,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Paal Payasam",
+              "price": 60,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "adyar",
+      "owner": {
+        "email": "chettinadkitchen.chennai@example.com",
+        "fullName": "Muthiah Palaniappan",
+        "phone": "+919840011003"
+      },
+      "name": "Adyar Chettinad Kitchen",
+      "description": "Fiery Chettinad curries, parottas and biryani by the Adyar river.",
+      "cuisines": [
+        "CHETTINAD",
+        "SOUTH_INDIAN",
+        "BIRYANI"
+      ],
+      "address": {
+        "line1": "21 Lattice Bridge Road",
+        "line2": "Adyar",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600020",
+        "latitude": 13.0063,
+        "longitude": 80.2574
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Curries",
+          "items": [
+            {
+              "name": "Chettinad Chicken Curry",
+              "price": 280,
+              "foodType": "NON_VEG",
+              "description": "Roasted spices, black pepper and curry leaves"
+            },
+            {
+              "name": "Pepper Mutton Fry",
+              "price": 340,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Veg Kurma with 2 Parottas",
+              "price": 150,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Parotta & Rice",
+          "items": [
+            {
+              "name": "Egg Kothu Parotta",
+              "price": 160,
+              "foodType": "EGG",
+              "description": "Shredded parotta tossed with egg and salna"
+            },
+            {
+              "name": "Chicken Biryani",
+              "price": 260,
+              "foodType": "NON_VEG",
+              "description": "Seeraga samba rice, served with raita and brinjal curry"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "anna-nagar",
+      "owner": {
+        "email": "biryanipoint.chennai@example.com",
+        "fullName": "Abdul Rahman",
+        "phone": "+919840011004"
+      },
+      "name": "Anna Nagar Biryani Point",
+      "description": "Dum biryani on 2nd Avenue, slow-cooked in copper handis.",
+      "cuisines": [
+        "BIRYANI",
+        "NORTH_INDIAN"
+      ],
+      "address": {
+        "line1": "AC-45, 2nd Avenue",
+        "line2": "Anna Nagar",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600040",
+        "latitude": 13.087,
+        "longitude": 80.2105
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Biryani",
+          "items": [
+            {
+              "name": "Chicken Dum Biryani",
+              "price": 250,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Mutton Biryani",
+              "price": 340,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Egg Biryani",
+              "price": 200,
+              "foodType": "EGG",
+              "description": null
+            },
+            {
+              "name": "Veg Biryani",
+              "price": 190,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Sides",
+          "items": [
+            {
+              "name": "Chicken 65",
+              "price": 220,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Onion Raita",
+              "price": 40,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "velachery",
+      "owner": {
+        "email": "dragonwok.chennai@example.com",
+        "fullName": "Chen Li Wei",
+        "phone": "+919840011005"
+      },
+      "name": "Velachery Dragon Wok",
+      "description": "Indo-Chinese favourites from the wok, on the Velachery bypass.",
+      "cuisines": [
+        "CHINESE"
+      ],
+      "address": {
+        "line1": "100 Feet Bypass Road",
+        "line2": "Velachery",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600042",
+        "latitude": 12.9786,
+        "longitude": 80.2186
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Noodles & Rice",
+          "items": [
+            {
+              "name": "Veg Hakka Noodles",
+              "price": 160,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Chicken Fried Rice",
+              "price": 190,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Egg Fried Rice",
+              "price": 170,
+              "foodType": "EGG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Starters",
+          "items": [
+            {
+              "name": "Gobi Manchurian",
+              "price": 150,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Chilli Chicken",
+              "price": 220,
+              "foodType": "NON_VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "besant-nagar",
+      "owner": {
+        "email": "beachcafe.chennai@example.com",
+        "fullName": "Nisha Fernandes",
+        "phone": "+919840011006"
+      },
+      "name": "Besant Nagar Beach Cafe",
+      "description": "Coffee, sandwiches and desserts a short walk from Elliot's Beach. Open 8 am to 11 pm.",
+      "cuisines": [
+        "CAFE",
+        "DESSERTS"
+      ],
+      "address": {
+        "line1": "4th Main Road",
+        "line2": "Besant Nagar",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600090",
+        "latitude": 13.0003,
+        "longitude": 80.2668
+      },
+      "hours": {
+        "opensAt": "08:00",
+        "closesAt": "23:00"
+      },
+      "menu": [
+        {
+          "category": "Cafe",
+          "items": [
+            {
+              "name": "Cold Coffee",
+              "price": 140,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Paneer Tikka Sandwich",
+              "price": 160,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Chicken Burger",
+              "price": 210,
+              "foodType": "NON_VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Desserts",
+          "items": [
+            {
+              "name": "Brownie with Ice Cream",
+              "price": 180,
+              "foodType": "EGG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "nungambakkam",
+      "owner": {
+        "email": "grillhouse.chennai@example.com",
+        "fullName": "Harpreet Singh",
+        "phone": "+919840011007"
+      },
+      "name": "Nungambakkam Grill House",
+      "description": "Tandoor and grills on Khader Nawaz Khan Road.",
+      "cuisines": [
+        "NORTH_INDIAN",
+        "TANDOOR"
+      ],
+      "address": {
+        "line1": "18 Khader Nawaz Khan Road",
+        "line2": "Nungambakkam",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600006",
+        "latitude": 13.0608,
+        "longitude": 80.2497
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Tandoor",
+          "items": [
+            {
+              "name": "Tandoori Chicken (Half)",
+              "price": 320,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Paneer Tikka",
+              "price": 260,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Butter Naan",
+              "price": 60,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "tambaram-udupi",
+      "owner": {
+        "email": "udupibhavan.chennai@example.com",
+        "fullName": "Venkatesh Rao",
+        "phone": "+919840011008"
+      },
+      "name": "Tambaram Udupi Bhavan",
+      "description": "Pure vegetarian Udupi tiffin and South Indian meals in East Tambaram.",
+      "cuisines": [
+        "SOUTH_INDIAN",
+        "BREAKFAST"
+      ],
+      "address": {
+        "line1": "8 Velachery Main Road",
+        "line2": "East Tambaram",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600073",
+        "latitude": 12.9226,
+        "longitude": 80.1333
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Tiffin",
+          "items": [
+            {
+              "name": "Masala Dosa",
+              "price": 90,
+              "foodType": "VEG",
+              "description": "Crisp dosa with potato masala, sambar and chutneys"
+            },
+            {
+              "name": "Rava Idli (2 pcs)",
+              "price": 70,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Mini Tiffin",
+              "price": 130,
+              "foodType": "VEG",
+              "description": "Mini idli, mini dosa, pongal, vada and kesari"
+            },
+            {
+              "name": "Onion Uthappam",
+              "price": 95,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Meals",
+          "items": [
+            {
+              "name": "South Indian Thali",
+              "price": 160,
+              "foodType": "VEG",
+              "description": "Rice, sambar, rasam, two poriyals, kootu, curd, appalam and a sweet"
+            },
+            {
+              "name": "Curd Rice",
+              "price": 80,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Drinks",
+          "items": [
+            {
+              "name": "Filter Coffee",
+              "price": 30,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Badam Milk",
+              "price": 50,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "porur-ambur",
+      "owner": {
+        "email": "amburbiryani.chennai@example.com",
+        "fullName": "Syed Basha",
+        "phone": "+919840011009"
+      },
+      "name": "Porur Ambur Biryani Centre",
+      "description": "Ambur-style seeraga samba biryani, slow-cooked on dum, on Mount Poonamallee Road.",
+      "cuisines": [
+        "BIRYANI",
+        "SOUTH_INDIAN"
+      ],
+      "address": {
+        "line1": "62 Mount Poonamallee Road",
+        "line2": "Porur",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600116",
+        "latitude": 13.0335,
+        "longitude": 80.163
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Biryani",
+          "items": [
+            {
+              "name": "Ambur Chicken Biryani",
+              "price": 220,
+              "foodType": "NON_VEG",
+              "description": "Seeraga samba rice with chicken, brinjal curry and onion raita"
+            },
+            {
+              "name": "Ambur Mutton Biryani",
+              "price": 320,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Egg Biryani",
+              "price": 160,
+              "foodType": "EGG",
+              "description": null
+            },
+            {
+              "name": "Veg Biryani",
+              "price": 150,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Starters",
+          "items": [
+            {
+              "name": "Chicken 65",
+              "price": 180,
+              "foodType": "NON_VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Desserts",
+          "items": [
+            {
+              "name": "Bread Halwa",
+              "price": 70,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "omr-spice",
+      "owner": {
+        "email": "spiceroute.chennai@example.com",
+        "fullName": "Aditya Sharma",
+        "phone": "+919840011010"
+      },
+      "name": "OMR Spice Route",
+      "description": "North Indian curries, tandoori breads and Indo-Chinese for the OMR tech parks.",
+      "cuisines": [
+        "NORTH_INDIAN",
+        "CHINESE"
+      ],
+      "address": {
+        "line1": "14 Elcot SEZ Main Road",
+        "line2": "Sholinganallur",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600119",
+        "latitude": 12.9105,
+        "longitude": 80.2205
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Curries",
+          "items": [
+            {
+              "name": "Paneer Butter Masala",
+              "price": 240,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Dal Makhani",
+              "price": 200,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Butter Chicken",
+              "price": 280,
+              "foodType": "NON_VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Breads",
+          "items": [
+            {
+              "name": "Butter Naan",
+              "price": 55,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Tandoori Roti",
+              "price": 35,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Chinese",
+          "items": [
+            {
+              "name": "Veg Fried Rice",
+              "price": 180,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Chilli Chicken",
+              "price": 230,
+              "foodType": "NON_VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Desserts",
+          "items": [
+            {
+              "name": "Gulab Jamun (2 pcs)",
+              "price": 70,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "perungudi-kerala",
+      "owner": {
+        "email": "keralakitchen.chennai@example.com",
+        "fullName": "Thomas Varghese",
+        "phone": "+919840011011"
+      },
+      "name": "Perungudi Kerala Kitchen",
+      "description": "Kerala home-style meals, appam with stew and coconut-rich fish curry on OMR.",
+      "cuisines": [
+        "KERALA",
+        "SEAFOOD"
+      ],
+      "address": {
+        "line1": "41 Rajiv Gandhi Salai (OMR)",
+        "line2": "Perungudi",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600096",
+        "latitude": 12.957,
+        "longitude": 80.2437
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Meals",
+          "items": [
+            {
+              "name": "Kerala Meals",
+              "price": 190,
+              "foodType": "VEG",
+              "description": "Matta rice, sambar, avial, thoran, pulissery, pappadam and payasam"
+            }
+          ]
+        },
+        {
+          "category": "Mains",
+          "items": [
+            {
+              "name": "Appam with Vegetable Stew",
+              "price": 140,
+              "foodType": "VEG",
+              "description": "Two appams with a mild coconut milk stew"
+            },
+            {
+              "name": "Malabar Parotta",
+              "price": 40,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Kerala Fish Curry",
+              "price": 260,
+              "foodType": "NON_VEG",
+              "description": "Seer fish in a tangy kudampuli and coconut gravy"
+            },
+            {
+              "name": "Nadan Chicken Curry",
+              "price": 230,
+              "foodType": "NON_VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Desserts",
+          "items": [
+            {
+              "name": "Ada Pradhaman",
+              "price": 70,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "medavakkam-parotta",
+      "owner": {
+        "email": "parottapoint.chennai@example.com",
+        "fullName": "Ganesan Perumal",
+        "phone": "+919840011012"
+      },
+      "name": "Medavakkam Parotta Point",
+      "description": "Flaky parottas with salna, kothu parotta and Chettinad curries.",
+      "cuisines": [
+        "SOUTH_INDIAN",
+        "CHETTINAD",
+        "STREET_FOOD"
+      ],
+      "address": {
+        "line1": "52 Velachery Main Road",
+        "line2": "Medavakkam",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600100",
+        "latitude": 12.918,
+        "longitude": 80.189
+      },
+      "hours": {
+        "opensAt": "00:00",
+        "closesAt": "23:59"
+      },
+      "menu": [
+        {
+          "category": "Parotta",
+          "items": [
+            {
+              "name": "Parotta with Veg Salna (2 pcs)",
+              "price": 70,
+              "foodType": "VEG",
+              "description": null
+            },
+            {
+              "name": "Chicken Kothu Parotta",
+              "price": 160,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Egg Kothu Parotta",
+              "price": 120,
+              "foodType": "EGG",
+              "description": null
+            },
+            {
+              "name": "Veechu Parotta",
+              "price": 50,
+              "foodType": "VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Curries",
+          "items": [
+            {
+              "name": "Chicken Chettinad",
+              "price": 210,
+              "foodType": "NON_VEG",
+              "description": null
+            },
+            {
+              "name": "Pepper Mutton Fry",
+              "price": 280,
+              "foodType": "NON_VEG",
+              "description": null
+            }
+          ]
+        },
+        {
+          "category": "Drinks",
+          "items": [
+            {
+              "name": "Jigarthanda",
+              "price": 80,
+              "foodType": "VEG",
+              "description": "Madurai-style milk, almond gum and ice cream"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "customers": [
+    {
+      "key": "dev-customer",
+      "email": "dev.customer@grocery.local",
+      "password": "Dev@12345",
+      "fullName": "Kavya Sriram",
+      "phone": "+919840066001",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "Flat 3A, Sri Sai Residency, AGS Colony 4th Main Road",
+          "line2": "AGS Colony, Velachery",
+          "landmark": "Off the Velachery 100 Feet Bypass Road",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600042",
+          "latitude": 12.9782,
+          "longitude": 80.212,
+          "isDefault": true
+        },
+        {
+          "label": "Office",
+          "line1": "International Tech Park, Taramani Road",
+          "line2": "Taramani",
+          "landmark": "Zenith building, main gate",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600113",
+          "latitude": 12.9839,
+          "longitude": 80.2461,
+          "isDefault": false
+        },
+        {
+          "label": "Parents",
+          "line1": "18 Kasturba Nagar 5th Main Road",
+          "line2": "Kasturba Nagar, Adyar",
+          "landmark": null,
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600020",
+          "latitude": 13.0039,
+          "longitude": 80.2485,
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "key": "lakshmi",
+      "email": "lakshmi.chennai@example.com",
+      "fullName": "Lakshmi Narayanan",
+      "phone": "+919840022001",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "15 Duraisamy Road",
+          "line2": "West Mambalam",
+          "landmark": "Near Ayodhya Mandapam",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600033",
+          "latitude": 13.0389,
+          "longitude": 80.2212,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "karthik",
+      "email": "karthik.chennai@example.com",
+      "fullName": "Karthik Subramanian",
+      "phone": "+919840022002",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "7 C.P. Ramaswamy Road",
+          "line2": "Alwarpet",
+          "landmark": "Opposite the Narada Gana Sabha",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600018",
+          "latitude": 13.0339,
+          "longitude": 80.2547,
+          "isDefault": true
+        },
+        {
+          "label": "Office",
+          "line1": "Tidel Park, Rajiv Gandhi Salai",
+          "line2": "Taramani",
+          "landmark": "Main tower, ground floor reception",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600113",
+          "latitude": 12.9894,
+          "longitude": 80.2486,
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "key": "divya",
+      "email": "divya.chennai@example.com",
+      "fullName": "Divya Krishnan",
+      "phone": "+919840022003",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "22 Kamaraj Nagar 3rd Street",
+          "line2": "Thiruvanmiyur",
+          "landmark": "Near the Marundeeswarar temple",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600041",
+          "latitude": 12.983,
+          "longitude": 80.2594,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "priya",
+      "email": "priya.chennai@example.com",
+      "fullName": "Priya Raman",
+      "phone": "+919840022004",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "3 Arcot Road",
+          "line2": "Kodambakkam",
+          "landmark": "Near the Kodambakkam railway station",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600024",
+          "latitude": 13.051,
+          "longitude": 80.2215,
+          "isDefault": true
+        },
+        {
+          "label": "Office",
+          "line1": "SIDCO Industrial Estate",
+          "line2": "Guindy",
+          "landmark": "Block B",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600032",
+          "latitude": 13.0108,
+          "longitude": 80.2143,
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "key": "arun",
+      "email": "arun.chennai@example.com",
+      "fullName": "Arun Kumar",
+      "phone": "+919840022005",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "9 Poonamallee High Road",
+          "line2": "Kilpauk",
+          "landmark": "Near the Kilpauk Medical College",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600010",
+          "latitude": 13.0789,
+          "longitude": 80.2421,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "sanjay",
+      "email": "sanjay.chennai@example.com",
+      "fullName": "Sanjay Venkatesh",
+      "phone": "+919840022006",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "12 Vijaya Nagar 2nd Main Road",
+          "line2": "Velachery",
+          "landmark": "Near the Phoenix MarketCity mall",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600042",
+          "latitude": 12.976,
+          "longitude": 80.219,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "fathima",
+      "email": "fathima.chennai@example.com",
+      "fullName": "Fathima Begum",
+      "phone": "+919840022007",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "34 Peters Road",
+          "line2": "Royapettah",
+          "landmark": "Opposite the Express Avenue gate",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600014",
+          "latitude": 13.0545,
+          "longitude": 80.264,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "deepak",
+      "email": "deepak.chennai@example.com",
+      "fullName": "Deepak Raj",
+      "phone": "+919840022008",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "W-112, 3rd Street",
+          "line2": "Anna Nagar West",
+          "landmark": "Behind the Tower Park",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600040",
+          "latitude": 13.0905,
+          "longitude": 80.205,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "meenakshi",
+      "email": "meenakshi.chennai@example.com",
+      "fullName": "Meenakshi Sundaram",
+      "phone": "+919840022009",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "14 Camp Road",
+          "line2": "Selaiyur, East Tambaram",
+          "landmark": "Near the Camp Road bus stop",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600073",
+          "latitude": 12.9202,
+          "longitude": 80.1445,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "harish",
+      "email": "harish.chennai@example.com",
+      "fullName": "Harish Babu",
+      "phone": "+919840022010",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "Flat 2A, Lake View Residency, Mugalivakkam Main Road",
+          "line2": "Mugalivakkam, Porur",
+          "landmark": "Off Mount Poonamallee Road",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600125",
+          "latitude": 13.0206,
+          "longitude": 80.1685,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "swathi",
+      "email": "swathi.chennai@example.com",
+      "fullName": "Swathi Ramesh",
+      "phone": "+919840022011",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "Flat 3C, Sai Krupa Apartments, Inner Ring Road",
+          "line2": "Ekkattuthangal, Guindy",
+          "landmark": "Near the Ekkattuthangal metro station",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600032",
+          "latitude": 13.0225,
+          "longitude": 80.2062,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "rahul",
+      "email": "rahul.chennai@example.com",
+      "fullName": "Rahul Menon",
+      "phone": "+919840022012",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "Flat 11B, Sea Breeze Towers, Rajiv Gandhi Salai (OMR)",
+          "line2": "Kumaran Nagar, Sholinganallur",
+          "landmark": "Opposite the Kumaran Nagar bus stop",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600119",
+          "latitude": 12.8782,
+          "longitude": 80.2272,
+          "isDefault": true
+        },
+        {
+          "label": "Office",
+          "line1": "ELCOT SEZ, Elcot SEZ Main Road",
+          "line2": "Sholinganallur",
+          "landmark": "Tower B, ground floor reception",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600119",
+          "latitude": 12.9112,
+          "longitude": 80.22,
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "key": "nandhini",
+      "email": "nandhini.chennai@example.com",
+      "fullName": "Nandhini Prakash",
+      "phone": "+919840022013",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "Flat 5A, Lotus Apartments, Kandanchavadi",
+          "line2": "Perungudi",
+          "landmark": "Near the Kandanchavadi bus stop on OMR",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600096",
+          "latitude": 12.9625,
+          "longitude": 80.2455,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "balamurugan",
+      "email": "balamurugan.chennai@example.com",
+      "fullName": "Balamurugan Selvam",
+      "phone": "+919840022014",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "9 Mambakkam Main Road",
+          "line2": "Medavakkam",
+          "landmark": "Near the Medavakkam junction",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600100",
+          "latitude": 12.914,
+          "longitude": 80.1905,
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "key": "aishwarya",
+      "email": "aishwarya.chennai@example.com",
+      "fullName": "Aishwarya Iyer",
+      "phone": "+919840022015",
+      "addresses": [
+        {
+          "label": "Home",
+          "line1": "Flat 4D, Ocean Pearl Apartments, Rajiv Gandhi Salai (OMR)",
+          "line2": "Thoraipakkam",
+          "landmark": "Second gate, next to the security cabin",
+          "city": "Chennai",
+          "state": "Tamil Nadu",
+          "postalCode": "600097",
+          "latitude": 12.948,
+          "longitude": 80.2395,
+          "isDefault": true
+        }
+      ]
+    }
+  ],
+  "partners": [
+    {
+      "key": "dev-partner",
+      "email": "dev.delivery@grocery.local",
+      "password": "Dev@12345",
+      "fullName": "Suresh Kannan",
+      "phone": "+919840066004",
+      "vehicleType": "MOTORCYCLE",
+      "vehicleNumber": "TN22EM7302",
+      "drivingLicenseNumber": "TN2220200093417",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 12.976,
+        "longitude": 80.2211,
+        "area": "Vijaya Nagar, Velachery"
+      }
+    },
+    {
+      "key": "senthil",
+      "email": "senthil.rider.chennai@example.com",
+      "fullName": "Senthil Kumar",
+      "phone": "+919840033001",
+      "vehicleType": "MOTORCYCLE",
+      "vehicleNumber": "TN09AB4521",
+      "drivingLicenseNumber": "TN0920190012345",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 13.0428,
+        "longitude": 80.2335,
+        "area": "Pondy Bazaar, T. Nagar"
+      }
+    },
+    {
+      "key": "ravi",
+      "email": "ravi.rider.chennai@example.com",
+      "fullName": "Ravi Shankar",
+      "phone": "+919840033002",
+      "vehicleType": "SCOOTER",
+      "vehicleNumber": "TN07CK8812",
+      "drivingLicenseNumber": "TN0720180045678",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 13.011,
+        "longitude": 80.255,
+        "area": "Adyar"
+      }
+    },
+    {
+      "key": "irfan",
+      "email": "irfan.rider.chennai@example.com",
+      "fullName": "Mohammed Irfan",
+      "phone": "+919840033003",
+      "vehicleType": "MOTORCYCLE",
+      "vehicleNumber": "TN06BZ3307",
+      "drivingLicenseNumber": "TN0620170098765",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 13.0352,
+        "longitude": 80.268,
+        "area": "Mylapore"
+      }
+    },
+    {
+      "key": "gopal",
+      "email": "gopal.rider.chennai@example.com",
+      "fullName": "Gopal Iyer",
+      "phone": "+919840033004",
+      "vehicleType": "BICYCLE",
+      "vehicleNumber": null,
+      "drivingLicenseNumber": null,
+      "status": "APPROVED",
+      "finalAvailability": "OFFLINE",
+      "base": {
+        "latitude": 13.086,
+        "longitude": 80.212,
+        "area": "Anna Nagar"
+      }
+    },
+    {
+      "key": "meena",
+      "email": "meena.rider.chennai@example.com",
+      "fullName": "Meena Devi",
+      "phone": "+919840033005",
+      "vehicleType": "SCOOTER",
+      "vehicleNumber": "TN22DM1290",
+      "drivingLicenseNumber": "TN2220210034567",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 12.98,
+        "longitude": 80.22,
+        "area": "Velachery"
+      }
+    },
+    {
+      "key": "vijay",
+      "email": "vijay.rider.chennai@example.com",
+      "fullName": "Vijay Anand",
+      "phone": "+919840033006",
+      "vehicleType": "MOTORCYCLE",
+      "vehicleNumber": "TN01AX7744",
+      "drivingLicenseNumber": "TN0120160076543",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 13.06,
+        "longitude": 80.248,
+        "area": "Nungambakkam"
+      }
+    },
+    {
+      "key": "prabhu",
+      "email": "prabhu.rider.chennai@example.com",
+      "fullName": "Prabhu Ramasamy",
+      "phone": "+919840033007",
+      "vehicleType": "MOTORCYCLE",
+      "vehicleNumber": "TN11BQ5528",
+      "drivingLicenseNumber": "TN1120190023456",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 12.9255,
+        "longitude": 80.1185,
+        "area": "Tambaram"
+      }
+    },
+    {
+      "key": "kathir",
+      "email": "kathir.rider.chennai@example.com",
+      "fullName": "Kathiravan Murugesan",
+      "phone": "+919840033008",
+      "vehicleType": "SCOOTER",
+      "vehicleNumber": "TN10AZ3391",
+      "drivingLicenseNumber": "TN1020200056789",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 13.0362,
+        "longitude": 80.1595,
+        "area": "Porur"
+      }
+    },
+    {
+      "key": "dinesh",
+      "email": "dinesh.rider.chennai@example.com",
+      "fullName": "Dinesh Kumar",
+      "phone": "+919840033009",
+      "vehicleType": "MOTORCYCLE",
+      "vehicleNumber": "TN22CF7710",
+      "drivingLicenseNumber": "TN2220180067890",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 13.0082,
+        "longitude": 80.2128,
+        "area": "Guindy"
+      }
+    },
+    {
+      "key": "saravanan",
+      "email": "saravanan.rider.chennai@example.com",
+      "fullName": "Saravanan Muthu",
+      "phone": "+919840033010",
+      "vehicleType": "MOTORCYCLE",
+      "vehicleNumber": "TN14AH8823",
+      "drivingLicenseNumber": "TN1420170078901",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 12.9035,
+        "longitude": 80.2272,
+        "area": "Sholinganallur (OMR)"
+      }
+    },
+    {
+      "key": "yasmin",
+      "email": "yasmin.rider.chennai@example.com",
+      "fullName": "Yasmin Banu",
+      "phone": "+919840033011",
+      "vehicleType": "SCOOTER",
+      "vehicleNumber": "TN14BK2047",
+      "drivingLicenseNumber": "TN1420210089012",
+      "status": "APPROVED",
+      "finalAvailability": "ONLINE",
+      "base": {
+        "latitude": 12.953,
+        "longitude": 80.242,
+        "area": "Perungudi and Thoraipakkam (OMR)"
+      }
+    },
+    {
+      "key": "arjun",
+      "email": "arjun.rider.chennai@example.com",
+      "fullName": "Arjun Prakash",
+      "phone": "+919840033012",
+      "vehicleType": "SCOOTER",
+      "vehicleNumber": "TN11CA6604",
+      "drivingLicenseNumber": "TN1120220090123",
+      "status": "APPROVED",
+      "finalAvailability": "OFFLINE",
+      "base": {
+        "latitude": 12.92,
+        "longitude": 80.187,
+        "area": "Medavakkam"
+      }
+    }
+  ],
+  "orders": [
+    {
+      "key": "delivered",
+      "about": "A finished delivery: placed, paid, accepted, picked up and delivered (history for the customer, the restaurant and the partner).",
+      "customer": "lakshmi",
+      "address": "Home",
+      "restaurant": "pondy-bazaar",
+      "partner": "senthil",
+      "items": [
+        {
+          "name": "Ghee Roast Dosa",
+          "quantity": 2
+        },
+        {
+          "name": "Filter Coffee",
+          "quantity": 2
+        }
+      ],
+      "note": "Please ring the bell twice.",
+      "target": "DELIVERED"
+    },
+    {
+      "key": "on-the-way",
+      "about": "Out for delivery: the partner picked it up and is halfway to the customer (live tracking).",
+      "customer": "karthik",
+      "address": "Home",
+      "restaurant": "mylapore",
+      "partner": "irfan",
+      "items": [
+        {
+          "name": "South Indian Meals",
+          "quantity": 1
+        },
+        {
+          "name": "Paal Payasam",
+          "quantity": 2
+        }
+      ],
+      "note": "Leave it with the security at the gate.",
+      "target": "PICKED_UP"
+    },
+    {
+      "key": "assigned",
+      "about": "Accepted by the restaurant and assigned to a partner who is heading there while the kitchen prepares it.",
+      "customer": "divya",
+      "address": "Home",
+      "restaurant": "adyar",
+      "partner": "ravi",
+      "items": [
+        {
+          "name": "Chettinad Chicken Curry",
+          "quantity": 1
+        },
+        {
+          "name": "Egg Kothu Parotta",
+          "quantity": 1
+        }
+      ],
+      "note": null,
+      "target": "ASSIGNED"
+    },
+    {
+      "key": "grocery-delivered",
+      "about": "A grocery order from Mylapore Fresh Mart, delivered to Royapettah.",
+      "customer": "fathima",
+      "address": "Home",
+      "vendor": "mylapore-fresh",
+      "partner": "vijay",
+      "items": [
+        {
+          "name": "Milk",
+          "quantity": 2
+        },
+        {
+          "name": "Banana",
+          "quantity": 1
+        },
+        {
+          "name": "Tomato",
+          "quantity": 1
+        }
+      ],
+      "note": "Please hand it to the watchman.",
+      "target": "DELIVERED"
+    },
+    {
+      "key": "grocery-delivered-2",
+      "about": "A grocery order from Velachery Green Grocers, delivered nearby.",
+      "customer": "sanjay",
+      "address": "Home",
+      "vendor": "velachery-greens",
+      "partner": "meena",
+      "items": [
+        {
+          "name": "Onion",
+          "quantity": 2
+        },
+        {
+          "name": "Tomato",
+          "quantity": 1
+        },
+        {
+          "name": "Coconut Water",
+          "quantity": 4
+        }
+      ],
+      "note": null,
+      "target": "DELIVERED"
+    },
+    {
+      "key": "tambaram-grocery-delivered",
+      "about": "A delivered grocery order from Tambaram Super Bazaar to Selaiyur.",
+      "customer": "meenakshi",
+      "address": "Home",
+      "vendor": "tambaram-super",
+      "partner": "prabhu",
+      "items": [
+        {
+          "name": "Aavin Full Cream Milk",
+          "quantity": 2
+        },
+        {
+          "name": "Robusta Banana",
+          "quantity": 1
+        },
+        {
+          "name": "India Gate Ponni Boiled Rice",
+          "quantity": 1
+        },
+        {
+          "name": "Aachi Sambar Powder",
+          "quantity": 1
+        }
+      ],
+      "note": "Please call when you reach the gate.",
+      "target": "DELIVERED"
+    },
+    {
+      "key": "omr-grocery-on-the-way",
+      "about": "Out for delivery on OMR: picked up at OMR Fresh Basket, heading to Kumaran Nagar (live tracking).",
+      "customer": "rahul",
+      "address": "Home",
+      "vendor": "omr-fresh",
+      "partner": "saravanan",
+      "items": [
+        {
+          "name": "Britannia Good Day Biscuits",
+          "quantity": 2
+        },
+        {
+          "name": "Lay's Classic Salted Potato Chips",
+          "quantity": 3
+        },
+        {
+          "name": "Real Orange Juice",
+          "quantity": 1
+        },
+        {
+          "name": "Bru Coffee Powder",
+          "quantity": 1
+        }
+      ],
+      "note": "Leave it with the security at the main gate.",
+      "target": "PICKED_UP"
+    },
+    {
+      "key": "porur-grocery-assigned",
+      "about": "Accepted by Porur Family Mart and assigned to a partner on the way to the store.",
+      "customer": "harish",
+      "address": "Home",
+      "vendor": "porur-family",
+      "partner": "kathir",
+      "items": [
+        {
+          "name": "Fortune Sunflower Oil",
+          "quantity": 1
+        },
+        {
+          "name": "Tomato",
+          "quantity": 1
+        },
+        {
+          "name": "Onion",
+          "quantity": 2
+        },
+        {
+          "name": "Suguna Farm Eggs",
+          "quantity": 1
+        }
+      ],
+      "note": null,
+      "target": "ASSIGNED"
+    },
+    {
+      "key": "medavakkam-grocery-delivered",
+      "about": "A delivered fresh-produce order from Medavakkam Fresh & Daily.",
+      "customer": "balamurugan",
+      "address": "Home",
+      "vendor": "medavakkam-fresh",
+      "partner": "arjun",
+      "items": [
+        {
+          "name": "Tomato",
+          "quantity": 1
+        },
+        {
+          "name": "Carrot",
+          "quantity": 1
+        },
+        {
+          "name": "Aavin Fresh Curd",
+          "quantity": 2
+        },
+        {
+          "name": "Shimla Apple",
+          "quantity": 1
+        }
+      ],
+      "note": "Please call on arrival instead of ringing the bell.",
+      "target": "DELIVERED"
+    },
+    {
+      "key": "perungudi-restaurant-delivered",
+      "about": "A delivered restaurant order from Perungudi Kerala Kitchen to Kandanchavadi.",
+      "customer": "nandhini",
+      "address": "Home",
+      "restaurant": "perungudi-kerala",
+      "partner": "yasmin",
+      "items": [
+        {
+          "name": "Appam with Vegetable Stew",
+          "quantity": 1
+        },
+        {
+          "name": "Kerala Fish Curry",
+          "quantity": 1
+        }
+      ],
+      "note": null,
+      "target": "DELIVERED"
+    }
+  ],
+  "vendors": [
+    {
+      "key": "dev-vendor",
+      "owner": {
+        "email": "dev.vendor@grocery.local",
+        "password": "Dev@12345",
+        "fullName": "Ramesh Babu",
+        "phone": "+919840066002"
+      },
+      "businessName": "Vijaya Nagar Fresh Mart",
+      "legalName": "Vijaya Nagar Fresh Mart",
+      "gstin": "33AVNFR6602K1Z8",
+      "fssaiLicense": "12419006000731",
+      "address": {
+        "line1": "46 Velachery Main Road",
+        "line2": "Vijaya Nagar, Velachery",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600042",
+        "latitude": 12.9772,
+        "longitude": 80.2213
+      },
+      "products": [
+        "CHN00101",
+        "CHN00102",
+        "CHN00103",
+        "CHN00201",
+        "CHN00202",
+        "CHN00203",
+        "CHN00301",
+        "CHN00302",
+        "CHN00303",
+        "CHN00401",
+        "CHN00402",
+        "CHN00403",
+        "CHN00501",
+        "CHN00502",
+        "CHN00503",
+        "CHN00601",
+        "CHN00602",
+        "CHN00603",
+        "CHN00701",
+        "CHN00702",
+        "CHN00703",
+        "CHN00801",
+        "CHN00802",
+        "CHN00803",
+        "CHN00901",
+        "CHN00902",
+        "CHN00903",
+        "CHN01001",
+        "CHN01002",
+        "CHN01003",
+        "PRD00601",
+        "PRD00602",
+        "PRD00603",
+        "PRD00604",
+        "PRD00605",
+        "PRD00606",
+        "PRD00607",
+        "PRD00608",
+        "PRD01101",
+        "PRD01102",
+        "PRD01103",
+        "PRD01104",
+        "PRD01105",
+        "PRD01106",
+        "PRD01107",
+        "PRD01108",
+        "PRD01401",
+        "PRD01402",
+        "PRD01403",
+        "PRD01404",
+        "PRD01405",
+        "PRD01406",
+        "PRD01407",
+        "PRD01408",
+        "PRD01501",
+        "PRD01502",
+        "PRD01503",
+        "PRD01504",
+        "PRD01505",
+        "PRD01506",
+        "PRD01507",
+        "PRD01508",
+        "PRD01601",
+        "PRD01602",
+        "PRD01603",
+        "PRD01604",
+        "PRD01605",
+        "PRD01606",
+        "PRD01607",
+        "PRD01801",
+        "PRD01802",
+        "PRD01803",
+        "PRD01804",
+        "PRD01805",
+        "PRD01806",
+        "PRD01807",
+        "PRD01808",
+        "PRD02001",
+        "PRD02002",
+        "PRD02003",
+        "PRD02004",
+        "PRD02005",
+        "PRD02006",
+        "PRD02007",
+        "PRD02008",
+        "PRD02009",
+        "PRD02010",
+        "PRD02101",
+        "PRD02102",
+        "PRD02103",
+        "PRD02104",
+        "PRD02106",
+        "PRD02107",
+        "PRD02201",
+        "PRD02202",
+        "PRD02203",
+        "PRD02204",
+        "PRD02205",
+        "PRD02206",
+        "PRD02301",
+        "PRD02302",
+        "PRD02303",
+        "PRD02304",
+        "PRD02305",
+        "PRD02306",
+        "PRD02401",
+        "PRD02402",
+        "PRD02403",
+        "PRD02404",
+        "PRD02405",
+        "PRD02501",
+        "PRD02502",
+        "PRD02503",
+        "PRD02504",
+        "PRD02505",
+        "PRD02506",
+        "PRD02601",
+        "PRD02602",
+        "PRD02603",
+        "PRD02604",
+        "PRD02605",
+        "PRD02606",
+        "PRD02701",
+        "PRD02702",
+        "PRD02703",
+        "PRD02704",
+        "PRD02705",
+        "PRD02706",
+        "PRD02801",
+        "PRD02802",
+        "PRD02803",
+        "PRD02804",
+        "PRD02805",
+        "PRD02806",
+        "PRD02901",
+        "PRD02902",
+        "PRD02903",
+        "PRD02904",
+        "PRD02905",
+        "PRD02906",
+        "PRD03001",
+        "PRD03002",
+        "PRD03003",
+        "PRD03004",
+        "PRD03005"
+      ]
+    },
+    {
+      "key": "mylapore-fresh",
+      "owner": {
+        "email": "mylaporefresh.chennai@example.com",
+        "fullName": "Ganesh Iyer",
+        "phone": "+919840044001"
+      },
+      "businessName": "Mylapore Fresh Mart",
+      "legalName": "Mylapore Fresh Mart LLP",
+      "gstin": "33AMFPM4521K1Z3",
+      "fssaiLicense": "12419006000123",
+      "address": {
+        "line1": "27 Luz Church Road",
+        "line2": "Mylapore",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600004",
+        "latitude": 13.0335,
+        "longitude": 80.265
+      },
+      "products": [
+        "PRD00101",
+        "PRD00102",
+        "PRD00104",
+        "PRD00106",
+        "PRD00201",
+        "PRD00202",
+        "PRD00203",
+        "PRD00205",
+        "PRD00301",
+        "PRD00302",
+        "PRD00305",
+        "PRD00306",
+        "PRD02901",
+        "PRD02902",
+        "PRD02903",
+        "PRD02904",
+        "PRD02905",
+        "PRD02906",
+        "PRD02401",
+        "PRD02402",
+        "PRD02403",
+        "PRD02404",
+        "PRD02405",
+        "PRD02301",
+        "PRD02302",
+        "PRD02303",
+        "PRD02304",
+        "PRD02305",
+        "PRD02306",
+        "PRD02801",
+        "PRD02802",
+        "PRD02803",
+        "PRD02804",
+        "PRD02805",
+        "PRD02806",
+        "PRD00601",
+        "PRD00602",
+        "PRD00603",
+        "PRD00604",
+        "PRD00605",
+        "PRD00606",
+        "PRD00607",
+        "PRD00608"
+      ]
+    },
+    {
+      "key": "tnagar-daily",
+      "owner": {
+        "email": "tnagardaily.chennai@example.com",
+        "fullName": "Revathi Sundaram",
+        "phone": "+919840044002"
+      },
+      "businessName": "T. Nagar Daily Needs",
+      "legalName": "Sundaram Provisions Pvt Ltd",
+      "gstin": "33ATNDN7788L1Z9",
+      "fssaiLicense": "12419006000245",
+      "address": {
+        "line1": "64 Usman Road",
+        "line2": "T. Nagar",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600017",
+        "latitude": 13.0388,
+        "longitude": 80.2337
+      },
+      "products": [
+        "PRD00402",
+        "PRD00404",
+        "PRD00501",
+        "PRD00507",
+        "PRD00601",
+        "PRD00603",
+        "PRD00702",
+        "PRD00704",
+        "PRD00808",
+        "PRD00809",
+        "PRD01305",
+        "PRD01301",
+        "PRD02501",
+        "PRD02502",
+        "PRD02503",
+        "PRD02504",
+        "PRD02505",
+        "PRD02506",
+        "PRD02601",
+        "PRD02602",
+        "PRD02603",
+        "PRD02604",
+        "PRD02605",
+        "PRD02606",
+        "PRD01101",
+        "PRD01102",
+        "PRD01103",
+        "PRD01104",
+        "PRD01105",
+        "PRD01106",
+        "PRD01107",
+        "PRD01108",
+        "PRD01501",
+        "PRD01502",
+        "PRD01503",
+        "PRD01504",
+        "PRD01505",
+        "PRD01506",
+        "PRD01507",
+        "PRD01508",
+        "PRD02901",
+        "PRD02902",
+        "PRD02903",
+        "PRD02904",
+        "PRD02905",
+        "PRD02906"
+      ]
+    },
+    {
+      "key": "adyar-organic",
+      "owner": {
+        "email": "adyarorganic.chennai@example.com",
+        "fullName": "Prakash Natarajan",
+        "phone": "+919840044003"
+      },
+      "businessName": "Adyar Organic Basket",
+      "legalName": "Adyar Organic Basket",
+      "gstin": "33AADOB3301M1Z2",
+      "fssaiLicense": "12419006000367",
+      "address": {
+        "line1": "15 Gandhi Nagar 1st Main Road",
+        "line2": "Adyar",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600020",
+        "latitude": 13.006,
+        "longitude": 80.253
+      },
+      "products": [
+        "PRD00405",
+        "PRD00406",
+        "PRD00503",
+        "PRD00606",
+        "PRD00703",
+        "PRD01401",
+        "PRD01403",
+        "PRD01302",
+        "PRD00109",
+        "PRD00107",
+        "PRD00204",
+        "PRD00209",
+        "PRD02801",
+        "PRD02802",
+        "PRD02803",
+        "PRD02804",
+        "PRD02805",
+        "PRD02806",
+        "PRD02201",
+        "PRD02202",
+        "PRD02203",
+        "PRD02204",
+        "PRD02205",
+        "PRD02206",
+        "PRD02301",
+        "PRD02302",
+        "PRD02303",
+        "PRD02304",
+        "PRD02305",
+        "PRD02306",
+        "PRD02701",
+        "PRD02702",
+        "PRD02703",
+        "PRD02704",
+        "PRD02705",
+        "PRD02706",
+        "PRD01402",
+        "PRD01404",
+        "PRD01405",
+        "PRD01406",
+        "PRD01407",
+        "PRD01408"
+      ]
+    },
+    {
+      "key": "annanagar-supermart",
+      "owner": {
+        "email": "annanagarsupermart.chennai@example.com",
+        "fullName": "Farooq Ahmed",
+        "phone": "+919840044004"
+      },
+      "businessName": "Anna Nagar Supermart",
+      "legalName": "Anna Nagar Supermart Pvt Ltd",
+      "gstin": "33AANSM5642N1Z7",
+      "fssaiLicense": "12419006000489",
+      "address": {
+        "line1": "Q-18, 3rd Avenue",
+        "line2": "Anna Nagar",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600040",
+        "latitude": 13.085,
+        "longitude": 80.215
+      },
+      "products": [
+        "PRD00903",
+        "PRD00904",
+        "PRD01001",
+        "PRD01101",
+        "PRD01201",
+        "PRD01203",
+        "PRD01501",
+        "PRD01701",
+        "PRD01704",
+        "PRD01901",
+        "PRD01903",
+        "PRD02001",
+        "PRD03001",
+        "PRD03002",
+        "PRD03003",
+        "PRD03004",
+        "PRD03005",
+        "PRD02501",
+        "PRD02502",
+        "PRD02503",
+        "PRD02504",
+        "PRD02505",
+        "PRD02506",
+        "PRD02601",
+        "PRD02602",
+        "PRD02603",
+        "PRD02604",
+        "PRD02605",
+        "PRD02606",
+        "PRD01601",
+        "PRD01602",
+        "PRD01603",
+        "PRD01604",
+        "PRD01605",
+        "PRD01606",
+        "PRD01607",
+        "PRD01801",
+        "PRD01802",
+        "PRD01803",
+        "PRD01804",
+        "PRD01805",
+        "PRD01806",
+        "PRD01807",
+        "PRD01808"
+      ]
+    },
+    {
+      "key": "velachery-greens",
+      "owner": {
+        "email": "velacherygreens.chennai@example.com",
+        "fullName": "Anitha Mohan",
+        "phone": "+919840044005"
+      },
+      "businessName": "Velachery Green Grocers",
+      "legalName": "Velachery Green Grocers",
+      "gstin": "33AVGGP9087P1Z4",
+      "fssaiLicense": "12419006000511",
+      "address": {
+        "line1": "8 Taramani Link Road",
+        "line2": "Velachery",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600042",
+        "latitude": 12.981,
+        "longitude": 80.224
+      },
+      "products": [
+        "PRD00103",
+        "PRD00105",
+        "PRD00108",
+        "PRD00206",
+        "PRD00207",
+        "PRD00208",
+        "PRD00201",
+        "PRD00203",
+        "PRD00301",
+        "PRD00307",
+        "PRD01204",
+        "PRD01404",
+        "PRD02101",
+        "PRD02102",
+        "PRD02103",
+        "PRD02104",
+        "PRD02106",
+        "PRD02107",
+        "PRD02201",
+        "PRD02202",
+        "PRD02203",
+        "PRD02204",
+        "PRD02205",
+        "PRD02206",
+        "PRD02301",
+        "PRD02302",
+        "PRD02303",
+        "PRD02304",
+        "PRD02305",
+        "PRD02306",
+        "PRD02401",
+        "PRD02402",
+        "PRD02403",
+        "PRD02404",
+        "PRD02405",
+        "PRD02701",
+        "PRD02702",
+        "PRD02703",
+        "PRD02704",
+        "PRD02705",
+        "PRD02706"
+      ]
+    },
+    {
+      "key": "tambaram-super",
+      "owner": {
+        "email": "tambaramsuper.chennai@example.com",
+        "fullName": "Murugan Pandian",
+        "phone": "+919840044006"
+      },
+      "businessName": "Tambaram Super Bazaar",
+      "legalName": "Pandian Traders",
+      "gstin": "33AATFP6612Q1Z5",
+      "fssaiLicense": "12419006000623",
+      "address": {
+        "line1": "112 Shanmugam Road",
+        "line2": "West Tambaram",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600045",
+        "latitude": 12.9267,
+        "longitude": 80.1146
+      },
+      "products": [
+        "CHN00101",
+        "CHN00102",
+        "CHN00103",
+        "CHN00201",
+        "CHN00202",
+        "CHN00203",
+        "CHN00301",
+        "CHN00302",
+        "CHN00303",
+        "CHN00401",
+        "CHN00402",
+        "CHN00403",
+        "CHN00501",
+        "CHN00502",
+        "CHN00503",
+        "CHN00601",
+        "CHN00602",
+        "CHN00603",
+        "CHN00701",
+        "CHN00702",
+        "CHN00703",
+        "CHN00801",
+        "CHN00802",
+        "CHN00803",
+        "CHN00901",
+        "CHN00902",
+        "CHN00903",
+        "CHN01001",
+        "CHN01002",
+        "CHN01003",
+        "PRD00601",
+        "PRD00602",
+        "PRD00603",
+        "PRD00604",
+        "PRD00605",
+        "PRD00606",
+        "PRD00607",
+        "PRD00608",
+        "PRD02101",
+        "PRD02102",
+        "PRD02103",
+        "PRD02104",
+        "PRD02106",
+        "PRD02107",
+        "PRD02701",
+        "PRD02702",
+        "PRD02703",
+        "PRD02704",
+        "PRD02705",
+        "PRD02706",
+        "PRD02901",
+        "PRD02902",
+        "PRD02903",
+        "PRD02904",
+        "PRD02905",
+        "PRD02906",
+        "PRD02001",
+        "PRD02002",
+        "PRD02003",
+        "PRD02004",
+        "PRD02005",
+        "PRD02006",
+        "PRD02007",
+        "PRD02008",
+        "PRD02009",
+        "PRD02010"
+      ]
+    },
+    {
+      "key": "porur-family",
+      "owner": {
+        "email": "porurfamilymart.chennai@example.com",
+        "fullName": "Kavitha Rajendran",
+        "phone": "+919840044007"
+      },
+      "businessName": "Porur Family Mart",
+      "legalName": "Porur Family Mart LLP",
+      "gstin": "33AAKFP3398R1Z8",
+      "fssaiLicense": "12419006000634",
+      "address": {
+        "line1": "45 Arcot Road",
+        "line2": "Porur",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600116",
+        "latitude": 13.0352,
+        "longitude": 80.1585
+      },
+      "products": [
+        "CHN00101",
+        "CHN00102",
+        "CHN00103",
+        "CHN00201",
+        "CHN00202",
+        "CHN00203",
+        "CHN00301",
+        "CHN00302",
+        "CHN00303",
+        "CHN00401",
+        "CHN00402",
+        "CHN00403",
+        "CHN00501",
+        "CHN00502",
+        "CHN00503",
+        "CHN00601",
+        "CHN00602",
+        "CHN00603",
+        "CHN00701",
+        "CHN00702",
+        "CHN00703",
+        "CHN00801",
+        "CHN00802",
+        "CHN00803",
+        "CHN00901",
+        "CHN00902",
+        "CHN00903",
+        "CHN01001",
+        "CHN01002",
+        "CHN01003",
+        "PRD01801",
+        "PRD01802",
+        "PRD01803",
+        "PRD01804",
+        "PRD01805",
+        "PRD01806",
+        "PRD01807",
+        "PRD01808",
+        "PRD01401",
+        "PRD01402",
+        "PRD01403",
+        "PRD01404",
+        "PRD01405",
+        "PRD01406",
+        "PRD01407",
+        "PRD01408",
+        "PRD02201",
+        "PRD02202",
+        "PRD02203",
+        "PRD02204",
+        "PRD02205",
+        "PRD02206",
+        "PRD02601",
+        "PRD02602",
+        "PRD02603",
+        "PRD02604",
+        "PRD02605",
+        "PRD02606"
+      ],
+      "stockScale": 0.9,
+      "outOfStock": [
+        "CHN00103"
+      ]
+    },
+    {
+      "key": "guindy-fresh",
+      "owner": {
+        "email": "guindyfresh.chennai@example.com",
+        "fullName": "Joseph Antony",
+        "phone": "+919840044008"
+      },
+      "businessName": "Guindy Daily Fresh",
+      "legalName": "Antony Provisions",
+      "gstin": "33ABHPA7204S1Z1",
+      "fssaiLicense": "12419006000645",
+      "address": {
+        "line1": "21 Alandur Road",
+        "line2": "Guindy",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600032",
+        "latitude": 13.0095,
+        "longitude": 80.211
+      },
+      "products": [
+        "CHN00101",
+        "CHN00102",
+        "CHN00103",
+        "CHN00201",
+        "CHN00202",
+        "CHN00203",
+        "CHN00301",
+        "CHN00302",
+        "CHN00303",
+        "CHN00401",
+        "CHN00402",
+        "CHN00403",
+        "CHN00501",
+        "CHN00502",
+        "CHN00503",
+        "CHN00601",
+        "CHN00602",
+        "CHN00603",
+        "CHN00701",
+        "CHN00702",
+        "CHN00703",
+        "CHN00801",
+        "CHN00802",
+        "CHN00803",
+        "PRD01501",
+        "PRD01502",
+        "PRD01503",
+        "PRD01504",
+        "PRD01505",
+        "PRD01506",
+        "PRD01507",
+        "PRD01508",
+        "PRD02501",
+        "PRD02502",
+        "PRD02503",
+        "PRD02504",
+        "PRD02505",
+        "PRD02506",
+        "PRD01601",
+        "PRD01602",
+        "PRD01603",
+        "PRD01604",
+        "PRD01605",
+        "PRD01606",
+        "PRD01607",
+        "PRD02301",
+        "PRD02302",
+        "PRD02303",
+        "PRD02304",
+        "PRD02305",
+        "PRD02306"
+      ],
+      "stockScale": 0.7
+    },
+    {
+      "key": "omr-fresh",
+      "owner": {
+        "email": "omrfreshbasket.chennai@example.com",
+        "fullName": "Vasanth Kumar",
+        "phone": "+919840044009"
+      },
+      "businessName": "OMR Fresh Basket",
+      "legalName": "OMR Fresh Basket Pvt Ltd",
+      "gstin": "33AABCO5127T1Z6",
+      "fssaiLicense": "12419006000656",
+      "address": {
+        "line1": "201 Rajiv Gandhi Salai (OMR)",
+        "line2": "Sholinganallur",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600119",
+        "latitude": 12.901,
+        "longitude": 80.2279
+      },
+      "products": [
+        "CHN00101",
+        "CHN00102",
+        "CHN00103",
+        "CHN00201",
+        "CHN00202",
+        "CHN00203",
+        "CHN00301",
+        "CHN00302",
+        "CHN00303",
+        "CHN00401",
+        "CHN00402",
+        "CHN00403",
+        "CHN00501",
+        "CHN00502",
+        "CHN00503",
+        "CHN00601",
+        "CHN00602",
+        "CHN00603",
+        "CHN00701",
+        "CHN00702",
+        "CHN00703",
+        "CHN00801",
+        "CHN00802",
+        "CHN00803",
+        "CHN00901",
+        "CHN00902",
+        "CHN00903",
+        "CHN01001",
+        "CHN01002",
+        "CHN01003",
+        "PRD03001",
+        "PRD03002",
+        "PRD03003",
+        "PRD03004",
+        "PRD03005",
+        "PRD01601",
+        "PRD01602",
+        "PRD01603",
+        "PRD01604",
+        "PRD01605",
+        "PRD01606",
+        "PRD01607",
+        "PRD02501",
+        "PRD02502",
+        "PRD02503",
+        "PRD02504",
+        "PRD02505",
+        "PRD02506",
+        "PRD02601",
+        "PRD02602",
+        "PRD02603",
+        "PRD02604",
+        "PRD02605",
+        "PRD02606",
+        "PRD01101",
+        "PRD01102",
+        "PRD01103",
+        "PRD01104",
+        "PRD01105",
+        "PRD01106",
+        "PRD01107",
+        "PRD01108"
+      ],
+      "stockScale": 1.1
+    },
+    {
+      "key": "thoraipakkam-super",
+      "owner": {
+        "email": "thoraipakkamsuper.chennai@example.com",
+        "fullName": "Shahul Hameed",
+        "phone": "+919840044010"
+      },
+      "businessName": "Thoraipakkam Super Store",
+      "legalName": "Hameed Retail LLP",
+      "gstin": "33AAJFH8841U1Z2",
+      "fssaiLicense": "12419006000667",
+      "address": {
+        "line1": "88 Rajiv Gandhi Salai (OMR)",
+        "line2": "Thoraipakkam",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600097",
+        "latitude": 12.942,
+        "longitude": 80.2386
+      },
+      "products": [
+        "CHN00301",
+        "CHN00302",
+        "CHN00303",
+        "CHN00401",
+        "CHN00402",
+        "CHN00403",
+        "CHN00501",
+        "CHN00502",
+        "CHN00503",
+        "CHN00601",
+        "CHN00602",
+        "CHN00603",
+        "CHN00701",
+        "CHN00702",
+        "CHN00703",
+        "CHN00801",
+        "CHN00802",
+        "CHN00803",
+        "CHN00901",
+        "CHN00902",
+        "CHN00903",
+        "CHN01001",
+        "CHN01002",
+        "CHN01003",
+        "PRD02101",
+        "PRD02102",
+        "PRD02103",
+        "PRD02104",
+        "PRD02106",
+        "PRD02107",
+        "PRD02801",
+        "PRD02802",
+        "PRD02803",
+        "PRD02804",
+        "PRD02805",
+        "PRD02806",
+        "PRD02401",
+        "PRD02402",
+        "PRD02403",
+        "PRD02404",
+        "PRD02405",
+        "PRD02001",
+        "PRD02002",
+        "PRD02003",
+        "PRD02004",
+        "PRD02005",
+        "PRD02006",
+        "PRD02007",
+        "PRD02008",
+        "PRD02009",
+        "PRD02010"
+      ],
+      "stockScale": 0.8
+    },
+    {
+      "key": "medavakkam-fresh",
+      "owner": {
+        "email": "medavakkamfresh.chennai@example.com",
+        "fullName": "Lalitha Gopinath",
+        "phone": "+919840044011"
+      },
+      "businessName": "Medavakkam Fresh & Daily",
+      "legalName": "Lalitha Stores",
+      "gstin": "33ALGPG2286V1Z9",
+      "fssaiLicense": "12419006000678",
+      "address": {
+        "line1": "16 Velachery Main Road",
+        "line2": "Medavakkam",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "postalCode": "600100",
+        "latitude": 12.9206,
+        "longitude": 80.1845
+      },
+      "products": [
+        "CHN00101",
+        "CHN00102",
+        "CHN00103",
+        "CHN00201",
+        "CHN00202",
+        "CHN00203",
+        "CHN00301",
+        "CHN00302",
+        "CHN00303",
+        "CHN00401",
+        "CHN00402",
+        "CHN00403",
+        "PRD00601",
+        "PRD00602",
+        "PRD00603",
+        "PRD00604",
+        "PRD00605",
+        "PRD00606",
+        "PRD00607",
+        "PRD00608",
+        "PRD02701",
+        "PRD02702",
+        "PRD02703",
+        "PRD02704",
+        "PRD02705",
+        "PRD02706",
+        "PRD02901",
+        "PRD02902",
+        "PRD02903",
+        "PRD02904",
+        "PRD02905",
+        "PRD02906",
+        "PRD02201",
+        "PRD02202",
+        "PRD02203",
+        "PRD02204",
+        "PRD02205",
+        "PRD02206",
+        "PRD01801",
+        "PRD01802",
+        "PRD01803",
+        "PRD01804",
+        "PRD01805",
+        "PRD01806",
+        "PRD01807",
+        "PRD01808"
+      ],
+      "stockScale": 0.6
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+# =====================================================================================================================
+# Profile "aws" of ai-orchestrator-service (contract Phase 14 §7): ECS Fargate, task definition grocery-<env>-ai-orchestrator-service.
+# The task definition (Terraform modules/platform + services.auto.tfvars.json) sets SPRING_PROFILES_ACTIVE=aws, so
+# this file is applied ALONE on top of application.yml (not with the docker profile). It reads ONLY environment
+# variables: plain values from the task definition, secrets from Secrets Manager through the task's `secrets` -
+# no secret and no environment-specific value is written here.
+# Infrastructure endpoints have no default: a missing one stops the service at start-up instead of silently
+# connecting to localhost.
+#
+# Environment:
+#   DB_HOST, DB_PORT (3306)                       RDS for MySQL 8.4 (TLS required)
+#   DB_USERNAME, DB_PASSWORD                      secret grocery/<env>/ai-orchestrator-service/db
+#   DB_SSL_MODE (REQUIRED)                        Connector/J sslMode; VERIFY_CA needs the RDS CA in a truststore
+#   JWT_ISSUER                                    https://<domain> (the issuer identity-service signs)
+#   IDENTITY_JWKS_URI                             identity JWKS through Service Connect
+#   AI_PROVIDER (anthropic), ANTHROPIC_MODEL      the model: Claude (production); GROCERY_AI_GATEWAY_URL
+#   ANTHROPIC_API_KEY                             secret grocery/<env>/ai-orchestrator-service/anthropic (api_key);
+#                                                 the placeholder REPLACE_ME = AI_UNAVAILABLE, nothing sent
+#   OLLAMA_BASE_URL, OLLAMA_MODEL                 only with AI_PROVIDER=ollama (unset = AI_UNAVAILABLE)
+#   AI_APPROVAL_SIGNING_KEY                       approval-token signing key (secret approval-signing-key)
+#   SCHEMA_REGISTRY_URL / GROCERY_EVENTS_AVRO_SCHEMA_REGISTRY_URL   http://schema-registry:8081 (Service Connect)
+#   OTEL_EXPORTER_OTLP_ENDPOINT (http://localhost:4318)   the ADOT sidecar of the task (traces -> X-Ray)
+#   TRACING_SAMPLING_PROBABILITY (0.1)            share of traces kept
+#   GROCERY_ENV                                   dev | staging | prod: the env tag of every metric and log line
+#   JAVA_TOOL_OPTIONS, TZ                         JVM sizing (MaxRAMPercentage), UTC
+#   AI_APPROVAL_EXPIRY_INTERVAL                   tunable (task definition, from services.auto.tfvars.json)
+#   AI_APPROVAL_TTL_ADMIN                         tunable (task definition, from services.auto.tfvars.json)
+#   AI_APPROVAL_TTL_CUSTOMER                      tunable (task definition, from services.auto.tfvars.json)
+#   AI_FOUR_EYES_REFUND_ABOVE                     tunable (task definition, from services.auto.tfvars.json)
+#   AI_MESSAGES_PER_HOUR                          tunable (task definition, from services.auto.tfvars.json)
+#   AI_MODEL_TIMEOUT                              tunable (task definition, from services.auto.tfvars.json)
+#   AI_VOICE_MODE (off), AI_VOICE_BASE_URL        voice chat: server | browser | off; the OpenAI-compatible audio API
+#   AI_VOICE_API_KEY                              secret grocery/<env>/ai-orchestrator-service/voice-api-key (server)
+# Run it locally against the docker stack ("aws-like"): infrastructure/ci/README.md, "application-aws.yml".
+# =====================================================================================================================
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 25s     # graceful shutdown inside the ECS stopTimeout (30 s)
+  datasource:
+    # RDS requires TLS: sslMode=REQUIRED (the docker profile's useSSL=false does not apply here)
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/ai_db?sslMode=${DB_SSL_MODE:REQUIRED}&connectionTimeZone=UTC
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:   # zero trust: every service validates the JWT itself (identity JWKS, issuer, audience)
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://identity-service:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER}
+
+grocery:
+  ai:
+    gateway-url: ${GROCERY_AI_GATEWAY_URL:http://api-gateway:8080}
+    # The production model is Claude (2026-11-20): AI_PROVIDER=anthropic, ANTHROPIC_API_KEY from Secrets Manager;
+    # model and key come from application.yml's grocery.ai.anthropic.* (environment variables only).
+    ollama:
+      # Only with AI_PROVIDER=ollama: without OLLAMA_BASE_URL nothing listens there and the assistant answers
+      # AI_UNAVAILABLE gracefully.
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    approvals:
+      signing-key: ${AI_APPROVAL_SIGNING_KEY}   # required: every replica signs/verifies with the same key
+    voice:
+      # Off until the operator chooses where speech is processed: server (AI_VOICE_BASE_URL + AI_VOICE_API_KEY from
+      # Secrets Manager) or browser (the browser's own speech features).
+      mode: ${AI_VOICE_MODE:off}
+      base-url: ${AI_VOICE_BASE_URL:}
+      api-key: ${AI_VOICE_API_KEY:}
+  events:
+    avro:
+      schema-registry-url: ${GROCERY_EVENTS_AVRO_SCHEMA_REGISTRY_URL:${SCHEMA_REGISTRY_URL:http://schema-registry:8081}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus   # /actuator/prometheus is scraped by the ADOT sidecar (-> AMP)
+  endpoint:
+    health:
+      probes:
+        enabled: true   # /actuator/health/liveness (container check), /actuator/health/readiness (ALB, deploys)
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+
+logging:
+  structured:
+    format:
+      console: ecs   # JSON lines (traceId, spanId, correlationId, service) -> CloudWatch Logs (awslogs)

@@ -1,0 +1,3 @@
+# grocery-common 0.9.0: observability defaults (lowest precedence; a service's own settings win)
+org.springframework.boot.EnvironmentPostProcessor=\
+com.grocery.common.observability.GroceryObservabilityEnvironmentPostProcessor

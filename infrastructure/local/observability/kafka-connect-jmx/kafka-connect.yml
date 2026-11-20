@@ -1,0 +1,140 @@
+# JMX exporter rules for kafka-connect (Kafka Connect worker + Debezium MySQL outbox connectors).
+# kafka-connect exposes remote JMX on kafka-connect:9012 (compose env JMXHOST/JMXPORT, internal network only).
+#
+# Metrics (used by alerts.yml and the "Kafka & Debezium" dashboard):
+#   kafka_connect_connector_status{connector,status}             1 for the current state (running, failed, paused ...)
+#   kafka_connect_connector_task_status{connector,task,status}   1 for the current state
+#   kafka_connect_worker_connector_<state>_task_count{connector} task counts per state
+#   kafka_connect_worker_<metric>                                worker totals (connector-count, task-count ...)
+#   kafka_connect_source_task_<metric>{connector,task}           source-record-poll/write totals and rates
+#   kafka_connect_task_error_<metric>{connector,task}            errors.tolerance counters
+#   debezium_streaming_<metric>{plugin,server}                   Debezium binlog reader (server = topic.prefix;
+#                                                                connector = "<server>-outbox")
+#       debezium_streaming_milliseconds_behind_source, debezium_streaming_connected, ...
+jmxUrl: service:jmx:rmi:///jndi/rmi://kafka-connect:9012/jmxrmi
+ssl: false
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+includeObjectNames:
+  - "kafka.connect:type=connect-worker-metrics"
+  - "kafka.connect:type=connect-worker-metrics,connector=*"
+  - "kafka.connect:type=connect-worker-rebalance-metrics"
+  - "kafka.connect:type=connector-metrics,connector=*"
+  - "kafka.connect:type=connector-task-metrics,connector=*,task=*"
+  - "kafka.connect:type=source-task-metrics,connector=*,task=*"
+  - "kafka.connect:type=task-error-metrics,connector=*,task=*"
+  - "debezium.mysql:type=connector-metrics,*"
+
+rules:
+  # ---- connector / task state: string attribute → value 1, state as a label
+  - pattern: 'kafka.connect<type=connector-metrics, connector=([^>]+)><>status: ([a-z-]+)'
+    name: kafka_connect_connector_status
+    value: 1
+    type: GAUGE
+    labels:
+      connector: "$1"
+      status: "$2"
+    help: "Kafka Connect connector state (1 = current state)"
+
+  - pattern: 'kafka.connect<type=connector-task-metrics, connector=([^,]+), task=([^>]+)><>status: ([a-z-]+)'
+    name: kafka_connect_connector_task_status
+    value: 1
+    type: GAUGE
+    labels:
+      connector: "$1"
+      task: "$2"
+      status: "$3"
+    help: "Kafka Connect task state (1 = current state)"
+
+  # ---- task numbers
+  - pattern: 'kafka.connect<type=connector-task-metrics, connector=([^,]+), task=([^>]+)><>([a-z-]+): ([0-9.eE+-]+)'
+    name: kafka_connect_connector_task_$3
+    type: GAUGE
+    labels:
+      connector: "$1"
+      task: "$2"
+
+  # ---- worker
+  - pattern: 'kafka.connect<type=connect-worker-metrics, connector=([^>]+)><>([a-z-]+): ([0-9.eE+-]+)'
+    name: kafka_connect_worker_$2
+    type: GAUGE
+    labels:
+      connector: "$1"
+
+  - pattern: 'kafka.connect<type=connect-worker-metrics><>([a-z-]+): ([0-9.eE+-]+)'
+    name: kafka_connect_worker_$1
+    type: GAUGE
+
+  - pattern: 'kafka.connect<type=connect-worker-rebalance-metrics><>([a-z-]+): ([0-9.eE+-]+)'
+    name: kafka_connect_worker_rebalance_$1
+    type: GAUGE
+
+  # ---- source tasks and error handling
+  # (*-total attributes as counters: a GAUGE named *_total would lose its suffix)
+  - pattern: 'kafka.connect<type=source-task-metrics, connector=([^,]+), task=([^>]+)><>source-record-(poll|write)-total: ([0-9.eE+-]+)'
+    name: kafka_connect_source_task_source_record_$3_total
+    type: COUNTER
+    labels:
+      connector: "$1"
+      task: "$2"
+
+  - pattern: 'kafka.connect<type=source-task-metrics, connector=([^,]+), task=([^>]+)><>([a-z-]+): ([0-9.eE+-]+)'
+    name: kafka_connect_source_task_$3
+    type: GAUGE
+    labels:
+      connector: "$1"
+      task: "$2"
+
+  - pattern: 'kafka.connect<type=task-error-metrics, connector=([^,]+), task=([^>]+)><>([a-z-]+): ([0-9.eE+-]+)'
+    name: kafka_connect_task_error_$3
+    type: GAUGE
+    labels:
+      connector: "$1"
+      task: "$2"
+
+  # ---- Debezium binlog reader (context=streaming). Explicit names for what the dashboards and alerts use.
+  - pattern: 'debezium.([^:]+)<type=connector-metrics, context=streaming, server=([^,>]+)(?:, task=[^>]+)?><>MilliSecondsBehindSource: ([0-9.eE+-]+)'
+    name: debezium_streaming_milliseconds_behind_source
+    type: GAUGE
+    labels:
+      plugin: "$1"
+      server: "$2"
+  - pattern: 'debezium.([^:]+)<type=connector-metrics, context=streaming, server=([^,>]+)(?:, task=[^>]+)?><>MilliSecondsSinceLastEvent: ([0-9.eE+-]+)'
+    name: debezium_streaming_milliseconds_since_last_event
+    type: GAUGE
+    labels:
+      plugin: "$1"
+      server: "$2"
+  - pattern: 'debezium.([^:]+)<type=connector-metrics, context=streaming, server=([^,>]+)(?:, task=[^>]+)?><>Connected: (.+)'
+    name: debezium_streaming_connected
+    type: GAUGE
+    labels:
+      plugin: "$1"
+      server: "$2"
+  - pattern: 'debezium.([^:]+)<type=connector-metrics, context=streaming, server=([^,>]+)(?:, task=[^>]+)?><>TotalNumberOfEventsSeen: ([0-9.eE+-]+)'
+    name: debezium_streaming_events_seen_total
+    type: COUNTER
+    labels:
+      plugin: "$1"
+      server: "$2"
+  - pattern: 'debezium.([^:]+)<type=connector-metrics, context=streaming, server=([^,>]+)(?:, task=[^>]+)?><>NumberOfCommittedTransactions: ([0-9.eE+-]+)'
+    name: debezium_streaming_committed_transactions_total
+    type: COUNTER
+    labels:
+      plugin: "$1"
+      server: "$2"
+  - pattern: 'debezium.([^:]+)<type=connector-metrics, context=streaming, server=([^,>]+)(?:, task=[^>]+)?><>QueueRemainingCapacity: ([0-9.eE+-]+)'
+    name: debezium_streaming_queue_remaining_capacity
+    type: GAUGE
+    labels:
+      plugin: "$1"
+      server: "$2"
+  - pattern: 'debezium.([^:]+)<type=connector-metrics, context=streaming, server=([^,>]+)(?:, task=[^>]+)?><>QueueTotalCapacity: ([0-9.eE+-]+)'
+    name: debezium_streaming_queue_total_capacity
+    type: GAUGE
+    labels:
+      plugin: "$1"
+      server: "$2"
+
+  # Attributes no rule matches (snapshot / schema-history contexts, other Debezium attributes) are not exported.

@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "VendorRegistered",
+  "namespace": "com.grocery.events.vendor",
+  "doc": "A vendor profile was created in status DRAFT (from UserRegistered with role VENDOR, or on the owner's first profile save). Producer: vendor-service, topic vendor.events, key vendorId. Shared vendor lifecycle payload (same fields as every Vendor* lifecycle event).",
+  "fields": [
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor (aggregate id and message key)."},
+    {"name": "ownerUserId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the vendor's owner (role VENDOR)."},
+    {"name": "businessName", "type": ["null", "string"], "default": null, "doc": "The vendor's business name; null while the draft profile has none."},
+    {"name": "reason", "type": ["null", "string"], "default": null, "doc": "Admin's reason on VendorRejected and VendorSuspended; null for the other lifecycle events."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User who caused the change: the owner (VendorRegistered, VendorSubmitted) or the admin (VendorApproved, VendorRejected, VendorSuspended, VendorReinstated); null when not applicable."}
+  ]
+}

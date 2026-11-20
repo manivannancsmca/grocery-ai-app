@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "DeliveryLocationUpdated",
+  "namespace": "com.grocery.events.delivery",
+  "doc": "Live position of a partner on an active delivery (ASSIGNED or PICKED_UP). High frequency, best effort, published directly without the outbox. Producer: delivery-service, topic delivery.location, key orderId (1 hour retention).",
+  "fields": [
+    {"name": "deliveryId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery."},
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "partnerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery partner."},
+    {"name": "latitude", "type": "double", "doc": "Latitude, WGS84 degrees."},
+    {"name": "longitude", "type": "double", "doc": "Longitude, WGS84 degrees."},
+    {"name": "heading", "type": ["null", "double"], "default": null, "doc": "Direction of travel in degrees from north (0-360); null if unknown."},
+    {"name": "speedKmh", "type": ["null", "double"], "default": null, "doc": "Speed in km/h; null if unknown."},
+    {"name": "accuracyMeters", "type": ["null", "double"], "default": null, "doc": "Reported accuracy radius in metres; null if unknown."},
+    {"name": "recordedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the position was recorded (UTC)."}
+  ]
+}

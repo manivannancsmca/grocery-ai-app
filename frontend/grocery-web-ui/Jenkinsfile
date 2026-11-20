@@ -1,0 +1,11 @@
+// grocery-web-ui: lint, unit tests, build, scans and the production image (contract Phase 14 §6 "Frontend pipeline").
+// JavaScript app, so no type check. It is a second copy of the web app, so it is never pushed or deployed: the SPA in
+// S3 + CloudFront stays grocery-web. Stages and parameters: infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryFrontendPipeline(
+    app: 'grocery-web-ui',
+    dir: 'frontend/grocery-web-ui',
+    typeCheck: false,
+    publish: false
+)

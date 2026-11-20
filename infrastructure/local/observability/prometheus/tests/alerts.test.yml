@@ -1,0 +1,530 @@
+# promtool unit tests for ../alerts.yml — one or more cases per alert (firing and not firing).
+# Run (Docker only):  infrastructure/local/observability/validate.sh
+rule_files:
+  - ../alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ---------------------------------------------------------------- ServiceDown
+  - name: ServiceDown fires for a service that was up, not for one that never started
+    interval: 1m
+    input_series:
+      - series: 'up{job="services", service="order-service", instance="order-service:8110"}'
+        values: '1x5 0x10'
+      - series: 'up{job="services", service="notification-service", instance="notification-service-2:8113"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ServiceDown
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: services
+              service: order-service
+              instance: order-service:8110
+            exp_annotations:
+              summary: "order-service is down"
+              description: "Prometheus cannot scrape order-service:8110 (/actuator/prometheus) for more than 1 minute."
+              dashboard: "http://localhost:3000/d/grocery-overview"
+              runbook: "docs/operations/troubleshooting.md#servicedown"
+
+  # ---------------------------------------------------------------- HighErrorRate
+  - name: HighErrorRate fires above 5 % of 5xx per service
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="services", service="order-service", instance="order-service:8110", method="POST", uri="/api/orders", status="500"}'
+        values: '0+6x20'
+      - series: 'http_server_requests_seconds_count{job="services", service="order-service", instance="order-service:8110", method="POST", uri="/api/orders", status="201"}'
+        values: '0+54x20'
+      - series: 'http_server_requests_seconds_count{job="services", service="payment-service", instance="payment-service:8111", method="GET", uri="/api/payments/{id}", status="500"}'
+        values: '0+1x20'
+      - series: 'http_server_requests_seconds_count{job="services", service="payment-service", instance="payment-service:8111", method="GET", uri="/api/payments/{id}", status="200"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: HighErrorRate
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: HighErrorRate
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: order-service
+            exp_annotations:
+              summary: "order-service: 10% of requests fail with 5xx"
+              description: "More than 5 % of HTTP requests answered 5xx over the last 5 minutes."
+              dashboard: "http://localhost:3000/d/grocery-service?var-service=order-service"
+              runbook: "docs/operations/troubleshooting.md#higherrorrate--slowrequests"
+
+  # ---------------------------------------------------------------- SlowRequests
+  - name: SlowRequests ignores SSE / chat streams and uses the gateway route timer
+    interval: 1m
+    input_series:
+      # order-service: every request takes 1-2 s → p95 1.95 s
+      - series: 'http_server_requests_seconds_bucket{job="services", service="order-service", instance="order-service:8110", uri="/api/orders", le="0.5"}'
+        values: '0x30'
+      - series: 'http_server_requests_seconds_bucket{job="services", service="order-service", instance="order-service:8110", uri="/api/orders", le="1.0"}'
+        values: '0x30'
+      - series: 'http_server_requests_seconds_bucket{job="services", service="order-service", instance="order-service:8110", uri="/api/orders", le="2.0"}'
+        values: '0+10x30'
+      - series: 'http_server_requests_seconds_bucket{job="services", service="order-service", instance="order-service:8110", uri="/api/orders", le="+Inf"}'
+        values: '0+10x30'
+      # notification-service: only the SSE stream is slow → excluded
+      - series: 'http_server_requests_seconds_bucket{job="services", service="notification-service", instance="notification-service:8113", uri="/api/notifications/stream", le="1.0"}'
+        values: '0x30'
+      - series: 'http_server_requests_seconds_bucket{job="services", service="notification-service", instance="notification-service:8113", uri="/api/notifications/stream", le="+Inf"}'
+        values: '0+10x30'
+      # ai-orchestrator: the chat stream is slow → excluded
+      - series: 'http_server_requests_seconds_bucket{job="services", service="ai-orchestrator-service", instance="ai-orchestrator-service:8115", uri="/api/ai/agents/{agent}/chat", le="1.0"}'
+        values: '0x30'
+      - series: 'http_server_requests_seconds_bucket{job="services", service="ai-orchestrator-service", instance="ai-orchestrator-service:8115", uri="/api/ai/agents/{agent}/chat", le="+Inf"}'
+        values: '0+10x30'
+      # api-gateway: proxied requests are uri="UNKNOWN" (would include streams) → ignored; route timer is fast
+      - series: 'http_server_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", uri="UNKNOWN", le="1.0"}'
+        values: '0x30'
+      - series: 'http_server_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", uri="UNKNOWN", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'spring_cloud_gateway_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", routeId="order", le="0.5"}'
+        values: '0+10x30'
+      - series: 'spring_cloud_gateway_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", routeId="order", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'spring_cloud_gateway_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", routeId="notification-stream", le="0.5"}'
+        values: '0x30'
+      - series: 'spring_cloud_gateway_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", routeId="notification-stream", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: SlowRequests
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: SlowRequests
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: order-service
+            exp_annotations:
+              summary: "order-service: p95 latency 1.95s"
+              description: "95th percentile of HTTP request duration is above 1 s for 10 minutes (streams excluded)."
+              dashboard: "http://localhost:3000/d/grocery-service?var-service=order-service"
+              runbook: "docs/operations/troubleshooting.md#higherrorrate--slowrequests"
+
+  - name: SlowRequests fires for the gateway from its route timer
+    interval: 1m
+    input_series:
+      - series: 'spring_cloud_gateway_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", routeId="catalog-query", le="1.0"}'
+        values: '0x30'
+      - series: 'spring_cloud_gateway_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", routeId="catalog-query", le="2.0"}'
+        values: '0+10x30'
+      - series: 'spring_cloud_gateway_requests_seconds_bucket{job="services", service="api-gateway", instance="api-gateway:8080", routeId="catalog-query", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: SlowRequests
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: api-gateway
+            exp_annotations:
+              summary: "api-gateway: p95 latency 1.95s"
+              description: "95th percentile of HTTP request duration is above 1 s for 10 minutes (streams excluded)."
+              dashboard: "http://localhost:3000/d/grocery-service?var-service=api-gateway"
+              runbook: "docs/operations/troubleshooting.md#higherrorrate--slowrequests"
+
+  # ---------------------------------------------------------------- JvmHeapHigh
+  - name: JvmHeapHigh fires above 90 % of the heap
+    interval: 1m
+    input_series:
+      - series: 'jvm_memory_used_bytes{job="services", service="order-service", instance="order-service:8110", area="heap", id="Tenured Gen"}'
+        values: '195x15'
+      - series: 'jvm_memory_max_bytes{job="services", service="order-service", instance="order-service:8110", area="heap", id="Tenured Gen"}'
+        values: '200x15'
+      - series: 'jvm_memory_used_bytes{job="services", service="order-service", instance="order-service:8110", area="heap", id="Eden Space"}'
+        values: '90x15'
+      - series: 'jvm_memory_max_bytes{job="services", service="order-service", instance="order-service:8110", area="heap", id="Eden Space"}'
+        values: '100x15'
+      - series: 'jvm_memory_used_bytes{job="services", service="order-service", instance="order-service:8110", area="nonheap", id="Metaspace"}'
+        values: '500x15'
+      - series: 'jvm_memory_max_bytes{job="services", service="order-service", instance="order-service:8110", area="nonheap", id="Metaspace"}'
+        values: '-1x15'
+      - series: 'jvm_memory_used_bytes{job="services", service="cart-service", instance="cart-service:8109", area="heap", id="Tenured Gen"}'
+        values: '100x15'
+      - series: 'jvm_memory_max_bytes{job="services", service="cart-service", instance="cart-service:8109", area="heap", id="Tenured Gen"}'
+        values: '200x15'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: JvmHeapHigh
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: JvmHeapHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: order-service
+              instance: order-service:8110
+            exp_annotations:
+              summary: "order-service:8110: heap 95% used"
+              description: "JVM heap used / max above 90 % for 10 minutes; the container may be undersized or leaking."
+              dashboard: "http://localhost:3000/d/grocery-service?var-service=order-service"
+              runbook: "docs/operations/troubleshooting.md#jvmheaphigh"
+
+  # ---------------------------------------------------------------- KafkaConsumerLagHigh
+  - name: KafkaConsumerLagHigh sums the lag of a group (negative lag ignored)
+    interval: 1m
+    input_series:
+      - series: 'kafka_consumergroup_lag{job="kafka", instance="kafka-exporter:9308", consumergroup="order-service", topic="payment.events", partition="0"}'
+        values: '80x10'
+      - series: 'kafka_consumergroup_lag{job="kafka", instance="kafka-exporter:9308", consumergroup="order-service", topic="payment.events", partition="1"}'
+        values: '50x10'
+      - series: 'kafka_consumergroup_lag{job="kafka", instance="kafka-exporter:9308", consumergroup="order-service", topic="payment.events", partition="2"}'
+        values: '-1x10'
+      - series: 'kafka_consumergroup_lag{job="kafka", instance="kafka-exporter:9308", consumergroup="cart-service", topic="order.events", partition="0"}'
+        values: '10x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: KafkaConsumerLagHigh
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: KafkaConsumerLagHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              consumergroup: order-service
+            exp_annotations:
+              summary: "Consumer group order-service lags 130 records"
+              description: "Total lag of the consumer group above 100 records for 5 minutes."
+              dashboard: "http://localhost:3000/d/grocery-kafka"
+              runbook: "docs/operations/troubleshooting.md#kafkaconsumerlaghigh"
+
+  # ---------------------------------------------------------------- DeadLettersPending
+  - name: DeadLettersPending counts each consumer group once across replicas
+    interval: 1m
+    input_series:
+      - series: 'grocery_dead_letters_pending{job="services", service="notification-service", instance="notification-service:8113", consumer_group="notification-service.dispatch"}'
+        values: '2x15'
+      - series: 'grocery_dead_letters_pending{job="services", service="notification-service", instance="notification-service-2:8113", consumer_group="notification-service.dispatch"}'
+        values: '2x15'
+      - series: 'grocery_dead_letters_pending{job="services", service="order-service", instance="order-service:8110", consumer_group="order-service"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: DeadLettersPending
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: DeadLettersPending
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: notification-service
+              consumer_group: notification-service.dispatch
+            exp_annotations:
+              summary: "2 dead letter(s) pending for notification-service.dispatch"
+              description: "Events of notification-service failed processing and wait in a DLT (Operations → Dead letters)."
+              dashboard: "http://localhost:3000/d/grocery-kafka"
+              runbook: "docs/operations/troubleshooting.md#deadletterspending"
+
+  # ---------------------------------------------------------------- ConnectorTaskFailed
+  - name: ConnectorTaskFailed fires for a failed task and a failed connector
+    interval: 1m
+    input_series:
+      - series: 'kafka_connect_connector_task_status{job="kafka-connect", instance="kafka-connect-jmx-exporter:9404", connector="order-outbox", task="0", status="failed"}'
+        values: '1x10'
+      - series: 'kafka_connect_connector_task_status{job="kafka-connect", instance="kafka-connect-jmx-exporter:9404", connector="payment-outbox", task="0", status="running"}'
+        values: '1x10'
+      - series: 'kafka_connect_connector_status{job="kafka-connect", instance="kafka-connect-jmx-exporter:9404", connector="order-outbox", status="running"}'
+        values: '1x10'
+      - series: 'kafka_connect_connector_status{job="kafka-connect", instance="kafka-connect-jmx-exporter:9404", connector="review-outbox", status="failed"}'
+        values: '1x10'
+      - series: 'kafka_connect_connector_status{job="kafka-connect", instance="kafka-connect-jmx-exporter:9404", connector="payment-outbox", status="running"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: ConnectorTaskFailed
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: ConnectorTaskFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              connector: order-outbox
+              task: "0"
+              status: failed
+            exp_annotations:
+              summary: "Kafka Connect order-outbox task 0 is failed"
+              description: "Outbox events of this connector are not published while it is not running."
+              dashboard: "http://localhost:3000/d/grocery-kafka"
+              runbook: "docs/operations/troubleshooting.md#connectortaskfailed"
+          - exp_labels:
+              severity: critical
+              connector: review-outbox
+              status: failed
+            exp_annotations:
+              summary: "Kafka Connect review-outbox is failed"
+              description: "Outbox events of this connector are not published while it is not running."
+              dashboard: "http://localhost:3000/d/grocery-kafka"
+              runbook: "docs/operations/troubleshooting.md#connectortaskfailed"
+
+  # ---------------------------------------------------------------- StuckOrders
+  - name: StuckOrders fires per reason
+    interval: 1m
+    input_series:
+      - series: 'grocery_orders_stuck{job="services", service="order-service", instance="order-service:8110", reason="PAYMENT_EXPIRY_OVERDUE"}'
+        values: '3x10'
+      - series: 'grocery_orders_stuck{job="services", service="order-service", instance="order-service:8110", reason="STOCK_CHECK_OVERDUE"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: StuckOrders
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: StuckOrders
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: order-service
+              reason: PAYMENT_EXPIRY_OVERDUE
+            exp_annotations:
+              summary: "3 stuck order(s): PAYMENT_EXPIRY_OVERDUE"
+              description: "The order watchdog flagged orders that stay too long in a status (Operations → Stuck orders)."
+              dashboard: "http://localhost:3000/d/grocery-business"
+              runbook: "docs/operations/troubleshooting.md#stuckorders"
+
+  # ---------------------------------------------------------------- PaymentFailureSpike
+  - name: PaymentFailureSpike fires above 30 % failed with at least 5 attempts
+    interval: 1m
+    input_series:
+      - series: 'grocery_events_published_total{job="services", service="payment-service", instance="payment-service:8111", topic="payment.events", event_type="PaymentFailed"}'
+        values: '0+1x40'
+      - series: 'grocery_events_published_total{job="services", service="payment-service", instance="payment-service:8111", topic="payment.events", event_type="PaymentCaptured"}'
+        values: '0+1x40'
+      - series: 'grocery_events_published_total{job="services", service="payment-service", instance="payment-service:8111", topic="payment.events", event_type="RefundCompleted"}'
+        values: '0+5x40'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: PaymentFailureSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: payment-service
+            exp_annotations:
+              summary: "50% of payment attempts failed in 15 minutes"
+              description: "Failed / (failed + captured) payments above 30 % with at least 5 attempts in 15 minutes."
+              dashboard: "http://localhost:3000/d/grocery-business"
+              runbook: "docs/operations/troubleshooting.md#paymentfailurespike--reconciliationfailures"
+
+  - name: PaymentFailureSpike needs at least 5 attempts
+    interval: 1m
+    input_series:
+      - series: 'grocery_events_published_total{job="services", service="payment-service", instance="payment-service:8111", topic="payment.events", event_type="PaymentFailed"}'
+        values: '0 0 0 0 0 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: PaymentFailureSpike
+        exp_alerts: []
+
+  # ---------------------------------------------------------------- ReconciliationFailures
+  - name: ReconciliationFailures fires on any failure in 15 minutes
+    interval: 1m
+    input_series:
+      - series: 'grocery_payments_reconciliation_failures_total{job="services", service="payment-service", instance="payment-service:8111"}'
+        values: '0x15 1x10'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: ReconciliationFailures
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ReconciliationFailures
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: payment-service
+            exp_annotations:
+              summary: "Payment reconciliation failed 1 time(s) in 15 minutes"
+              description: "The reconciliation job could not check payments at the provider (GET /api/admin/payments/reconciliation)."
+              dashboard: "http://localhost:3000/d/grocery-business"
+              runbook: "docs/operations/troubleshooting.md#paymentfailurespike--reconciliationfailures"
+
+  # ---------------------------------------------------------------- AiModelUnavailable
+  - name: AiModelUnavailable fires after 10 minutes without a model
+    interval: 1m
+    input_series:
+      - series: 'grocery_ai_model_available{job="services", service="ai-orchestrator-service", instance="ai-orchestrator-service:8115", provider="ollama"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: AiModelUnavailable
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: AiModelUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: info
+              service: ai-orchestrator-service
+              provider: ollama
+            exp_annotations:
+              summary: "AI model provider ollama unavailable"
+              description: "Assistant chats answer AI_UNAVAILABLE until the model is reachable (Ollama pulled and running?)."
+              dashboard: "http://localhost:3000/d/grocery-business"
+              runbook: "docs/operations/troubleshooting.md#aimodelunavailable"
+
+  # ---------------------------------------------------------------- EmailFailures
+  - name: EmailFailures sums both notification replicas
+    interval: 1m
+    input_series:
+      - series: 'grocery_emails_total{job="services", service="notification-service", instance="notification-service:8113", status="FAILED"}'
+        values: '0x15 1x10'
+      - series: 'grocery_emails_total{job="services", service="notification-service", instance="notification-service-2:8113", status="FAILED"}'
+        values: '0x15 1x10'
+      - series: 'grocery_emails_total{job="services", service="notification-service", instance="notification-service:8113", status="SENT"}'
+        values: '0+3x25'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: EmailFailures
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: EmailFailures
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: notification-service
+            exp_annotations:
+              summary: "2 email(s) failed in 30 minutes"
+              description: "notification-service could not hand emails to SMTP; the email outbox retries them."
+              dashboard: "http://localhost:3000/d/grocery-business"
+              runbook: "docs/operations/troubleshooting.md#emailfailures"
+
+  # ---------------------------------------------------------------- DatabaseDown / RedisDown / ElasticsearchDown
+  - name: DatabaseDown, RedisDown and ElasticsearchDown fire when the exporter reports *_up 0
+    interval: 1m
+    input_series:
+      - series: 'mysql_up{job="mysql", instance="mysqld-exporter:9104"}'
+        values: '1x3 0x10'
+      - series: 'up{job="mysql", instance="mysqld-exporter:9104"}'
+        values: '1x13'
+      - series: 'redis_up{job="redis", instance="redis-exporter:9121"}'
+        values: '1x3 0x10'
+      - series: 'up{job="redis", instance="redis-exporter:9121"}'
+        values: '1x13'
+      - series: 'elasticsearch_scrape_success{job="elasticsearch", instance="elasticsearch-exporter:9114", collector="cluster-info"}'
+        values: '1x3 0x10'
+      - series: 'up{job="elasticsearch", instance="elasticsearch-exporter:9114"}'
+        values: '1x13'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: DatabaseDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: DatabaseDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: mysql
+              instance: mysqld-exporter:9104
+            exp_annotations:
+              summary: "MySQL is unreachable"
+              description: "mysqld-exporter cannot connect to mysql:3306 (or the exporter itself is down)."
+              dashboard: "http://localhost:3000/d/grocery-data"
+              runbook: "docs/operations/troubleshooting.md#databasedown--redisdown--elasticsearchdown"
+      - eval_time: 6m
+        alertname: RedisDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: redis
+              instance: redis-exporter:9121
+            exp_annotations:
+              summary: "Redis is unreachable"
+              description: "redis-exporter cannot connect to redis:6379 (or the exporter itself is down)."
+              dashboard: "http://localhost:3000/d/grocery-data"
+              runbook: "docs/operations/troubleshooting.md#databasedown--redisdown--elasticsearchdown"
+      - eval_time: 6m
+        alertname: ElasticsearchDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: elasticsearch
+              instance: elasticsearch-exporter:9114
+            exp_annotations:
+              summary: "Elasticsearch is unreachable"
+              description: "elasticsearch-exporter cannot read the cluster health of elasticsearch:9200."
+              dashboard: "http://localhost:3000/d/grocery-data"
+              runbook: "docs/operations/troubleshooting.md#databasedown--redisdown--elasticsearchdown"
+
+  - name: DatabaseDown fires when the exporter itself is down
+    interval: 1m
+    input_series:
+      - series: 'up{job="mysql", instance="mysqld-exporter:9104"}'
+        values: '1x3 0x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: DatabaseDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: mysql
+              instance: mysqld-exporter:9104
+            exp_annotations:
+              summary: "MySQL is unreachable"
+              description: "mysqld-exporter cannot connect to mysql:3306 (or the exporter itself is down)."
+              dashboard: "http://localhost:3000/d/grocery-data"
+              runbook: "docs/operations/troubleshooting.md#databasedown--redisdown--elasticsearchdown"
+
+  - name: ElasticsearchDown does not fire when Elasticsearch was never started
+    interval: 1m
+    input_series:
+      - series: 'elasticsearch_scrape_success{job="elasticsearch", instance="elasticsearch-exporter:9114", collector="cluster-info"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ElasticsearchDown
+        exp_alerts: []
+
+  # ---------------------------------------------------------------- LogShippingStalled
+  - name: LogShippingStalled fires when Loki receives nothing for 15 minutes, not while lines flow
+    interval: 1m
+    input_series:
+      # lines arrive for 10 minutes, then the counter stops growing
+      - series: 'loki_distributor_lines_received_total{job="observability", instance="loki:3100", tenant="fake"}'
+        values: '0+120x10 1200x30'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: LogShippingStalled
+        exp_alerts: []
+      - eval_time: 26m
+        alertname: LogShippingStalled
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "No log line has reached Loki for 15 minutes"
+              description: "Alloy is not shipping container logs; restart it (docker restart grocery-alloy-1). Lines written meanwhile are read again from the container logs."
+              dashboard: "http://localhost:3000/d/grocery-overview"
+              runbook: "docs/operations/troubleshooting.md#logshippingstalled"
+
+  # ---------------------------------------------------------------- MonitoringTargetDown
+  - name: MonitoringTargetDown fires for exporters, not for services
+    interval: 1m
+    input_series:
+      - series: 'up{job="kafka", instance="kafka-exporter:9308"}'
+        values: '0x10'
+      - series: 'up{job="services", service="cart-service", instance="cart-service:8109"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: MonitoringTargetDown
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: MonitoringTargetDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: kafka
+              instance: kafka-exporter:9308
+            exp_annotations:
+              summary: "Scrape target kafka (kafka-exporter:9308) is down"
+              description: "Alerts that depend on this target cannot fire while it is down."
+              dashboard: "http://localhost:9090/targets"
+              runbook: "docs/operations/troubleshooting.md#monitoringtargetdown"

@@ -1,0 +1,11 @@
+# Build context for Java services is the repository root; keep it small.
+**/target
+**/node_modules
+**/.idea
+**/*.iml
+**/.vscode
+.git
+docs
+frontend
+infrastructure
+**/*.log

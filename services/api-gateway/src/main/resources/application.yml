@@ -1,0 +1,591 @@
+# Defaults = running from the IDE ("local"); Docker Compose sets service URLs via env vars.
+server:
+  port: 8080
+  shutdown: graceful
+
+grocery:
+  gateway:
+    dns-cache-max-ttl: ${GATEWAY_DNS_CACHE_MAX_TTL:5s}   # see DownstreamClientConfig: replaced containers get new IPs
+    allowed-origins: ${GATEWAY_ALLOWED_ORIGINS:http://localhost:6420}
+    rate-limit:
+      api-replenish: ${RATE_LIMIT_API_REPLENISH:20}     # tokens/second per user (or IP when anonymous)
+      api-burst: ${RATE_LIMIT_API_BURST:40}
+      auth-replenish: ${RATE_LIMIT_AUTH_REPLENISH:2}   # every /api/auth/** call per client IP (login, register, refresh, password forgot/reset)
+      auth-burst: ${RATE_LIMIT_AUTH_BURST:10}
+      # Proxies in front of the gateway that append to X-Forwarded-For (RateLimitConfig): 0 = ignore the header,
+      # 1 = local / one load balancer, 2 = AWS (CloudFront + ALB). Entries further left are client-written, never trusted.
+      trusted-proxies: ${GATEWAY_TRUSTED_PROXIES:1}
+
+spring:
+  application:
+    name: api-gateway
+  # Reactor restores thread-locals (MDC correlationId / traceId / spanId) from the subscriber context in operators, so
+  # the gateway's own log lines carry them like the services' do (Phase 13)
+  reactor:
+    context-propagation: auto
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://localhost:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://identity.grocery.local}
+          audiences: grocery-api
+  cloud:
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 2000        # ms — a dead service fails fast (503)
+            response-timeout: 15s        # → 504; streamed routes (Phase 7 SSE, Phase 11 chat) override this per route
+            pool:
+              max-idle-time: 30s         # drop idle connections: a replaced container never leaves stale ones behind
+          # Phase 13: spring.cloud.gateway.requests{routeId,…} (route latency for the dashboards and SlowRequests)
+          metrics:
+            enabled: true
+          # Clients must never be able to assert identity through headers. Phase 11: X-Approval-Token is passed through
+          # untouched (like Idempotency-Key): ai-orchestrator-service sends it with an approved action, and the target
+          # service verifies it completely (signature, audience, method/path, body hash, sub = the JWT's sub, single use).
+          default-filters:
+            - RemoveRequestHeader=X-User-Id
+            - RemoveRequestHeader=X-User-Roles
+            - RemoveRequestHeader=X-Internal-Token
+          routes:
+            # ---------------- identity. /api/auth/** includes /api/auth/password/{change,forgot,reset}: all on the per-IP
+            # auth limit (forgot and reset are public, SecurityConfig.PUBLIC_PATHS).
+            - id: identity-auth
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8101}
+              predicates:
+                - Path=/api/auth/**,/.well-known/jwks.json
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.auth-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.auth-burst}
+                    key-resolver: "#{@ipKeyResolver}"
+            - id: identity-admin
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8101}
+              predicates:
+                - Path=/api/admin/users,/api/admin/users/**
+              filters: &api-rate-limit
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            # ---------------- Phase 12: reviews, coupons, returns, purchasing, email, reporting. Defined BEFORE the
+            # stakeholder routes below on purpose (first match wins): /api/restaurant/** (restaurant-service) must not
+            # swallow /api/restaurant/coupons, and every new /api/vendor/* path must reach its own service.
+            # /api/admin/** still needs an admin role at the edge (SecurityConfig); GET /api/reviews and
+            # GET /api/reviews/summary are public reads (product and restaurant pages for guests).
+            - id: review
+              uri: ${REVIEW_SERVICE_URL:http://localhost:8114}
+              predicates:
+                - Path=/api/reviews,/api/reviews/**,/api/store/reviews,/api/store/reviews/**,/api/admin/reviews,/api/admin/reviews/**
+              filters: *api-rate-limit
+            - id: pricing-coupons
+              uri: ${PRICING_SERVICE_URL:http://localhost:8108}
+              predicates:
+                - Path=/api/coupons,/api/coupons/**,/api/vendor/coupons,/api/vendor/coupons/**,/api/restaurant/coupons,/api/restaurant/coupons/**,/api/admin/coupons,/api/admin/coupons/**
+              filters: *api-rate-limit
+            # A customer requests a return under /api/orders/{id}/returns (the order route below)
+            - id: order-returns
+              uri: ${ORDER_SERVICE_URL:http://localhost:8110}
+              predicates:
+                - Path=/api/returns,/api/returns/**,/api/store/returns,/api/store/returns/**,/api/admin/returns,/api/admin/returns/**
+              filters: *api-rate-limit
+            # Complaints (docs/api/payment-and-support-agents.md §2): customers raise them, support admins resolve them
+            - id: order-complaints
+              uri: ${ORDER_SERVICE_URL:http://localhost:8110}
+              predicates:
+                - Path=/api/complaints,/api/complaints/**,/api/admin/complaints,/api/admin/complaints/**
+              filters: *api-rate-limit
+            - id: vendor-purchasing
+              uri: ${VENDOR_SERVICE_URL:http://localhost:8103}
+              predicates:
+                - Path=/api/vendor/suppliers,/api/vendor/suppliers/**,/api/vendor/purchase-orders,/api/vendor/purchase-orders/**,/api/admin/purchase-orders,/api/admin/purchase-orders/**
+              filters: *api-rate-limit
+            # Email preferences (also matched by /api/notifications/** below) and the admin email log
+            - id: notification-email
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8113}
+              predicates:
+                - Path=/api/notifications/preferences,/api/admin/notifications,/api/admin/notifications/**
+              filters: *api-rate-limit
+            # /api/admin/audit: the central audit trail (one search across every service's audit events)
+            - id: reporting
+              uri: ${REPORTING_SERVICE_URL:http://localhost:8116}
+              predicates:
+                - Path=/api/admin/reports,/api/admin/reports/**,/api/admin/audit,/api/admin/audit/**
+              filters: *api-rate-limit
+            # ---------------- admin platform settings (docs/api/platform-settings.md): each area lives in the service
+            # that uses it, with its change history (/history). /api/admin/** needs an admin role at the edge; the service
+            # lets only SUPER_ADMIN and OPS_ADMIN save.
+            - id: settings-delivery
+              uri: ${DELIVERY_SERVICE_URL:http://localhost:8112}
+              predicates:
+                - Path=/api/admin/settings/delivery,/api/admin/settings/delivery/history
+              filters: *api-rate-limit
+            - id: settings-grocery-stores
+              uri: ${VENDOR_SERVICE_URL:http://localhost:8103}
+              predicates:
+                - Path=/api/admin/settings/grocery-stores,/api/admin/settings/grocery-stores/history
+              filters: *api-rate-limit
+            - id: settings-restaurants
+              uri: ${RESTAURANT_SERVICE_URL:http://localhost:8104}
+              predicates:
+                - Path=/api/admin/settings/restaurants,/api/admin/settings/restaurants/history
+              filters: *api-rate-limit
+            - id: settings-returns
+              uri: ${ORDER_SERVICE_URL:http://localhost:8110}
+              predicates:
+                - Path=/api/admin/settings/returns,/api/admin/settings/returns/history
+              filters: *api-rate-limit
+            - id: settings-reviews
+              uri: ${REVIEW_SERVICE_URL:http://localhost:8114}
+              predicates:
+                - Path=/api/admin/settings/reviews,/api/admin/settings/reviews/history
+              filters: *api-rate-limit
+            - id: settings-delivery-fees
+              uri: ${PRICING_SERVICE_URL:http://localhost:8108}
+              predicates:
+                - Path=/api/admin/settings/delivery-fees,/api/admin/settings/delivery-fees/history
+              filters: *api-rate-limit
+            # ---------------- stakeholder services
+            - id: customer
+              uri: ${CUSTOMER_SERVICE_URL:http://localhost:8102}
+              predicates:
+                - Path=/api/customers/**,/api/admin/customers,/api/admin/customers/**
+              filters: *api-rate-limit
+            - id: vendor
+              uri: ${VENDOR_SERVICE_URL:http://localhost:8103}
+              predicates:
+                # Phase 8: the vendor's order queue and sales reports live in vendor-service too; so does the public
+                # store directory (/api/stores/**, a guest read: SecurityConfig.PUBLIC_READ_PATHS)
+                - Path=/api/vendors/**,/api/admin/vendors,/api/admin/vendors/**,/api/vendor/orders,/api/vendor/orders/**,/api/vendor/reports/**,/api/stores/**
+              filters: *api-rate-limit
+            - id: restaurant
+              uri: ${RESTAURANT_SERVICE_URL:http://localhost:8104}
+              # /api/restaurants/me = onboarding profile; /api/restaurant/** = the owner's workspace (menu, operations)
+              predicates:
+                - Path=/api/restaurants/**,/api/restaurant/**,/api/admin/restaurants,/api/admin/restaurants/**
+              filters: *api-rate-limit
+            - id: delivery
+              uri: ${DELIVERY_SERVICE_URL:http://localhost:8112}
+              predicates:
+                # Phase 9: deliveries, offers, partner location, customer tracking and the admin delivery monitor
+                - Path=/api/delivery/**,/api/admin/delivery-partners,/api/admin/delivery-partners/**,/api/admin/deliveries,/api/admin/deliveries/**
+              filters: *api-rate-limit
+            # ---------------- catalog (Phase 3): writes → catalog-command, reads/search → catalog-query
+            - id: catalog-command
+              uri: ${CATALOG_COMMAND_SERVICE_URL:http://localhost:8105}
+              predicates:
+                - Path=/api/vendor/products,/api/vendor/products/**,/api/vendor/brands,/api/admin/categories,/api/admin/categories/**,/api/admin/products,/api/admin/products/**,/api/admin/catalog/**
+              filters: *api-rate-limit
+            # /api/mcp/catalog: the MCP pilot's product search tool (POST, a token required, as everywhere off GET reads)
+            - id: catalog-query
+              uri: ${CATALOG_QUERY_SERVICE_URL:http://localhost:8106}
+              predicates:
+                - Path=/api/search/**,/api/catalog/**,/api/admin/search/**,/api/mcp/catalog
+              filters: *api-rate-limit
+            # ---------------- inventory & pricing (Phase 4). The price quote (/api/prices/quote) is internal: not routed.
+            - id: inventory
+              uri: ${INVENTORY_SERVICE_URL:http://localhost:8107}
+              predicates:
+                - Path=/api/vendor/inventory,/api/vendor/inventory/**,/api/admin/inventory/**
+              filters: *api-rate-limit
+            - id: pricing
+              uri: ${PRICING_SERVICE_URL:http://localhost:8108}
+              predicates:
+                - Path=/api/vendor/prices,/api/vendor/prices/**,/api/vendor/price-change-requests,/api/vendor/price-change-requests/**,/api/admin/price-change-requests,/api/admin/price-change-requests/**,/api/admin/pricing/**
+              filters: *api-rate-limit
+            # ---------------- cart & checkout preview (Phase 5)
+            - id: cart
+              uri: ${CART_SERVICE_URL:http://localhost:8109}
+              predicates:
+                - Path=/api/cart,/api/cart/**
+              filters: *api-rate-limit
+            # ---------------- orders & payments (Phase 6)
+            # /api/mcp/orders: the MCP pilot's order status tool (POST, a token required)
+            - id: order
+              uri: ${ORDER_SERVICE_URL:http://localhost:8110}
+              predicates:
+                - Path=/api/orders,/api/orders/**,/api/admin/orders,/api/admin/orders/**,/api/admin/stats,/api/mcp/orders
+              filters: *api-rate-limit
+            # Razorpay's webhook: no token (payment-service verifies the signature); limited per client IP.
+            - id: payment-webhook
+              uri: ${PAYMENT_SERVICE_URL:http://localhost:8111}
+              predicates:
+                - Path=/api/payments/razorpay/webhook
+                - Method=POST
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@ipKeyResolver}"
+            - id: payment
+              uri: ${PAYMENT_SERVICE_URL:http://localhost:8111}
+              predicates:
+                - Path=/api/payments/**,/api/admin/payments,/api/admin/payments/**,/api/admin/refunds,/api/admin/refunds/**
+              filters: *api-rate-limit
+            # ---------------- real-time (Phase 7). The SSE stream lives for the whole token lifetime, so its route has
+            # NO response timeout (-1 disables the 15 s default). Defined before the general route: first match wins.
+            # Server-Sent Events are flushed event by event (text/event-stream is a streaming media type).
+            - id: notification-stream
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8113}
+              predicates:
+                - Path=/api/notifications/stream
+              metadata:
+                response-timeout: -1
+              filters: *api-rate-limit
+            - id: notification
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8113}
+              predicates:
+                - Path=/api/notifications,/api/notifications/**
+              filters: *api-rate-limit
+            # ---------------- AI assistants & human approval (Phase 11). The chat answer is a text/event-stream that
+            # lasts as long as the model needs (CPU inference is slow): NO response timeout. The insights report waits
+            # for one structured model answer (AI_MODEL_TIMEOUT, 120 s by default) before its rules fallback, so its
+            # route allows 150 s. Both are defined before the general route: first match wins.
+            # /.well-known/approval-jwks.json and /internal/** of ai-orchestrator-service are deliberately NOT routed.
+            - id: ai-chat-stream
+              uri: ${AI_ORCHESTRATOR_SERVICE_URL:http://localhost:8115}
+              predicates:
+                - Path=/api/ai/agents/*/chat
+              metadata:
+                response-timeout: -1
+              filters: *api-rate-limit
+            - id: ai-insights
+              uri: ${AI_ORCHESTRATOR_SERVICE_URL:http://localhost:8115}
+              predicates:
+                - Path=/api/ai/agents/*/insights
+              metadata:
+                response-timeout: 150000
+              filters: *api-rate-limit
+            # Voice (speech to text, text to speech): a CPU speech server can take tens of seconds (loading a model,
+            # a long recording), so the route waits longer than the 15 s default: the service's own AI_VOICE_TIMEOUT
+            # (30 s; 60 s for the local speaches) plus a margin. Defined before the general route: first match wins.
+            - id: ai-voice
+              uri: ${AI_ORCHESTRATOR_SERVICE_URL:http://localhost:8115}
+              predicates:
+                - Path=/api/ai/voice/**
+              metadata:
+                response-timeout: 75000
+              filters: *api-rate-limit
+            # Chat API, approvals (any signed-in user; the service decides who may see or decide what) and the AI
+            # audit / monitoring (/api/admin/** already requires an admin role at the edge).
+            - id: ai-orchestrator
+              uri: ${AI_ORCHESTRATOR_SERVICE_URL:http://localhost:8115}
+              predicates:
+                - Path=/api/ai/**,/api/approvals,/api/approvals/**,/api/admin/ai/**
+              filters: *api-rate-limit
+            # ---------------- operations (Phase 10): each service's dead letters, and Debezium connector health.
+            # /api/admin/** already requires an admin role; replay/discard need SUPER_ADMIN or OPS_ADMIN in the service.
+            - id: ops-dead-letters-identity
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8101}
+              predicates:
+                - Path=/api/admin/ops/identity/dead-letters,/api/admin/ops/identity/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/identity/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-customer
+              uri: ${CUSTOMER_SERVICE_URL:http://localhost:8102}
+              predicates:
+                - Path=/api/admin/ops/customer/dead-letters,/api/admin/ops/customer/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/customer/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-vendor
+              uri: ${VENDOR_SERVICE_URL:http://localhost:8103}
+              predicates:
+                - Path=/api/admin/ops/vendor/dead-letters,/api/admin/ops/vendor/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/vendor/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-restaurant
+              uri: ${RESTAURANT_SERVICE_URL:http://localhost:8104}
+              predicates:
+                - Path=/api/admin/ops/restaurant/dead-letters,/api/admin/ops/restaurant/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/restaurant/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-catalog-command
+              uri: ${CATALOG_COMMAND_SERVICE_URL:http://localhost:8105}
+              predicates:
+                - Path=/api/admin/ops/catalog-command/dead-letters,/api/admin/ops/catalog-command/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/catalog-command/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-catalog-query
+              uri: ${CATALOG_QUERY_SERVICE_URL:http://localhost:8106}
+              predicates:
+                - Path=/api/admin/ops/catalog-query/dead-letters,/api/admin/ops/catalog-query/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/catalog-query/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-inventory
+              uri: ${INVENTORY_SERVICE_URL:http://localhost:8107}
+              predicates:
+                - Path=/api/admin/ops/inventory/dead-letters,/api/admin/ops/inventory/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/inventory/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-pricing
+              uri: ${PRICING_SERVICE_URL:http://localhost:8108}
+              predicates:
+                - Path=/api/admin/ops/pricing/dead-letters,/api/admin/ops/pricing/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/pricing/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-cart
+              uri: ${CART_SERVICE_URL:http://localhost:8109}
+              predicates:
+                - Path=/api/admin/ops/cart/dead-letters,/api/admin/ops/cart/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/cart/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-order
+              uri: ${ORDER_SERVICE_URL:http://localhost:8110}
+              predicates:
+                - Path=/api/admin/ops/order/dead-letters,/api/admin/ops/order/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/order/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-payment
+              uri: ${PAYMENT_SERVICE_URL:http://localhost:8111}
+              predicates:
+                - Path=/api/admin/ops/payment/dead-letters,/api/admin/ops/payment/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/payment/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-delivery
+              uri: ${DELIVERY_SERVICE_URL:http://localhost:8112}
+              predicates:
+                - Path=/api/admin/ops/delivery/dead-letters,/api/admin/ops/delivery/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/delivery/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-notification
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8113}
+              predicates:
+                - Path=/api/admin/ops/notification/dead-letters,/api/admin/ops/notification/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/notification/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            # Phase 12: the two new consuming services (grocery-common's dead-letter API)
+            - id: ops-dead-letters-review
+              uri: ${REVIEW_SERVICE_URL:http://localhost:8114}
+              predicates:
+                - Path=/api/admin/ops/review/dead-letters,/api/admin/ops/review/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/review/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            - id: ops-dead-letters-reporting
+              uri: ${REPORTING_SERVICE_URL:http://localhost:8116}
+              predicates:
+                - Path=/api/admin/ops/reporting/dead-letters,/api/admin/ops/reporting/dead-letters/**
+              filters:
+                - RewritePath=/api/admin/ops/reporting/dead-letters(?<rest>.*), /api/admin/dead-letters$\{rest}
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: ${grocery.gateway.rate-limit.api-replenish}
+                    redis-rate-limiter.burstCapacity: ${grocery.gateway.rate-limit.api-burst}
+                    key-resolver: "#{@userOrIpKeyResolver}"
+            # Kafka Connect has no authentication of its own: only these two calls are exposed, admins only (restart: see
+            # SecurityConfig, SUPER_ADMIN / OPS_ADMIN). The response is Kafka Connect's own JSON.
+            - id: ops-connectors-status
+              uri: ${KAFKA_CONNECT_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/admin/system/connectors
+                - Method=GET
+              filters:
+                - SetPath=/connectors
+                - AddRequestParameter=expand, status
+            - id: ops-connectors-restart
+              uri: ${KAFKA_CONNECT_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/admin/system/connectors/{name}/restart
+                - Method=POST
+              filters:
+                - SetPath=/connectors/{name}/restart
+                - AddRequestParameter=includeTasks, true
+                - AddRequestParameter=onlyFailed, true
+            # Service-to-service endpoints (/internal/**) are deliberately NOT routed: they answer 404 from outside.
+            # ---------------- public health pass-through (status only) for the UI
+            - id: health-identity
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8101}
+              predicates: [ Path=/api/health/identity ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-customer
+              uri: ${CUSTOMER_SERVICE_URL:http://localhost:8102}
+              predicates: [ Path=/api/health/customer ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-vendor
+              uri: ${VENDOR_SERVICE_URL:http://localhost:8103}
+              predicates: [ Path=/api/health/vendor ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-restaurant
+              uri: ${RESTAURANT_SERVICE_URL:http://localhost:8104}
+              predicates: [ Path=/api/health/restaurant ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-delivery
+              uri: ${DELIVERY_SERVICE_URL:http://localhost:8112}
+              predicates: [ Path=/api/health/delivery ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-catalog-command
+              uri: ${CATALOG_COMMAND_SERVICE_URL:http://localhost:8105}
+              predicates: [ Path=/api/health/catalog-command ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-catalog-query
+              uri: ${CATALOG_QUERY_SERVICE_URL:http://localhost:8106}
+              predicates: [ Path=/api/health/catalog-query ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-inventory
+              uri: ${INVENTORY_SERVICE_URL:http://localhost:8107}
+              predicates: [ Path=/api/health/inventory ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-pricing
+              uri: ${PRICING_SERVICE_URL:http://localhost:8108}
+              predicates: [ Path=/api/health/pricing ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-cart
+              uri: ${CART_SERVICE_URL:http://localhost:8109}
+              predicates: [ Path=/api/health/cart ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-order
+              uri: ${ORDER_SERVICE_URL:http://localhost:8110}
+              predicates: [ Path=/api/health/order ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-payment
+              uri: ${PAYMENT_SERVICE_URL:http://localhost:8111}
+              predicates: [ Path=/api/health/payment ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-notification
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8113}
+              predicates: [ Path=/api/health/notification ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-ai
+              uri: ${AI_ORCHESTRATOR_SERVICE_URL:http://localhost:8115}
+              predicates: [ Path=/api/health/ai ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-review
+              uri: ${REVIEW_SERVICE_URL:http://localhost:8114}
+              predicates: [ Path=/api/health/review ]
+              filters: [ SetPath=/actuator/health ]
+            - id: health-reporting
+              uri: ${REPORTING_SERVICE_URL:http://localhost:8116}
+              predicates: [ Path=/api/health/reporting ]
+              filters: [ SetPath=/actuator/health ]
+
+# Phase 13 observability (docs/api/phase-13-observability-and-testing.md §1) — by hand, the same as grocery-common
+# 0.9.0 gives the services. The gateway is the only internet-facing unit, so its actuator (health, info and its OWN
+# metrics) listens on a separate, internal management port: Prometheus scrapes api-gateway:9080, the container health
+# check and the ADOT sidecar use localhost:9080, and on the public port every /actuator/** path answers 404. Load
+# balancers check readiness through GET /api/health/gateway (GatewayHealthController). No route ever forwards
+# /actuator/** to a service.
+management:
+  server:
+    port: ${GATEWAY_MANAGEMENT_PORT:9080}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:                                        # common tags on every meter (as grocery-common's customizer)
+      service: ${spring.application.name}
+      env: ${GROCERY_ENV:local}
+      instance: ${HOSTNAME:${COMPUTERNAME:localhost}}   # the container id in Docker, the pod in Kubernetes
+    distribution:
+      slo:                                       # explicit buckets → p95 with histogram_quantile (SlowRequests)
+        "[http.server.requests]": ${grocery.observability.latency-slo:50ms,100ms,250ms,500ms,1s,2s,5s}
+        # proxied requests are uri="UNKNOWN" in http.server.requests: the gateway's p95 per route comes from this one
+        "[spring.cloud.gateway.requests]": ${grocery.observability.latency-slo:50ms,100ms,250ms,500ms,1s,2s,5s}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}   # 0.1 in AWS; downstream services keep this decision
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          # OTLP/HTTP; without a collector the batches are dropped in the background (requests never wait)
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+    resource-attributes:
+      "[deployment.environment.name]": ${GROCERY_ENV:local}
+      "[service.instance.id]": ${HOSTNAME:${COMPUTERNAME:localhost}}
+
+# ECS log lines (docker profile) carry the environment and the instance, as grocery-common sets them for the services;
+# traceId / spanId / correlationId come from the MDC
+logging:
+  structured:
+    ecs:
+      service:
+        environment: ${GROCERY_ENV:local}
+        node-name: ${HOSTNAME:${COMPUTERNAME:localhost}}
+
+info:
+  service: api-gateway
+  phase: 12

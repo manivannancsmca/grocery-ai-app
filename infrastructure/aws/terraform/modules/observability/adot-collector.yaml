@@ -1,0 +1,81 @@
+# ADOT collector configuration shared by every service task (SSM parameter /grocery/<env>/adot/collector-config,
+# injected as AOT_CONFIG_CONTENT). Per-task values come from the sidecar's environment (set by modules/ecs-service):
+#   APP_PORT, METRICS_PATH, AMP_REMOTE_WRITE_ENDPOINT, GROCERY_ENV, SERVICE_NAME; AWS_REGION is set by Fargate.
+#
+#   metrics: scrape the app's /actuator/prometheus every 15 s (job "services", like Phase 13 locally) -> AMP remote write
+#   traces:  OTLP from the app (OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318) -> X-Ray
+#   logs:    not here - both containers log JSON to CloudWatch Logs through the awslogs driver
+extensions:
+  health_check:
+    endpoint: 127.0.0.1:13133
+  sigv4auth:
+    region: ${env:AWS_REGION}
+    service: aps
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+  prometheus:
+    config:
+      global:
+        scrape_interval: 15s
+        scrape_timeout: 10s
+      scrape_configs:
+        - job_name: services
+          honor_labels: true
+          metrics_path: ${env:METRICS_PATH}
+          static_configs:
+            - targets: ["127.0.0.1:${env:APP_PORT}"]
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  resource_detection:
+    detectors: [env, ecs]
+    timeout: 2s
+    override: false
+  # Every task scrapes 127.0.0.1:<port>, so the task id is what tells two replicas' series apart in AMP.
+  resource/metrics:
+    attributes:
+      - key: task_id
+        from_attribute: aws.ecs.task.id
+        action: upsert
+      - pattern: ^(aws|cloud|host|os|container|net|server|url|http|telemetry)\..*
+        action: delete
+  batch/metrics:
+    timeout: 30s
+  batch/traces:
+    timeout: 1s
+    send_batch_size: 50
+
+exporters:
+  prometheus_remote_write:
+    endpoint: ${env:AMP_REMOTE_WRITE_ENDPOINT}
+    auth:
+      authenticator: sigv4auth
+    resource_to_telemetry_conversion:
+      enabled: true
+  awsxray:
+    region: ${env:AWS_REGION}
+    indexed_attributes: [correlationId]
+
+service:
+  extensions: [health_check, sigv4auth]
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      processors: [memory_limiter, resource_detection, resource/metrics, batch/metrics]
+      exporters: [prometheus_remote_write]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource_detection, batch/traces]
+      exporters: [awsxray]
+  telemetry:
+    logs:
+      level: warn

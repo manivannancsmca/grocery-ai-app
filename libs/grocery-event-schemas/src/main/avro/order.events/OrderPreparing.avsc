@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "OrderPreparing",
+  "namespace": "com.grocery.events.order",
+  "doc": "The store started preparing (restaurant) or packing (grocery) the order (status PREPARING). Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "preparingAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When preparation started (UTC)."}
+  ]
+}

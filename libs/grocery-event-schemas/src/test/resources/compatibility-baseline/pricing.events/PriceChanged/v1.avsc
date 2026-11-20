@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "PriceChanged",
+  "namespace": "com.grocery.events.pricing",
+  "doc": "The live price of a product changed (priceVersion + 1), or was re-sent by a republish (same priceVersion). Producer: pricing-service, topic pricing.events, key productId. priceVersion is the search index's external version.",
+  "fields": [
+    {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product (message key)."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that sells the product."},
+    {"name": "mrp", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Maximum retail price in the currency, 2 decimals."},
+    {"name": "sellingPrice", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Selling price in the currency, 2 decimals (1.00 <= sellingPrice <= mrp)."},
+    {"name": "currency", "type": "string", "doc": "ISO 4217 currency code, always INR today."},
+    {"name": "priceVersion", "type": "long", "doc": "Strictly increasing per product with every price change (1 = first price)."},
+    {"name": "changedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the live price last changed (UTC)."}
+  ]
+}

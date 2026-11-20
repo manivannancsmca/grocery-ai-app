@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "VendorOrderRejected",
+  "namespace": "com.grocery.events.vendor",
+  "doc": "The vendor rejected the order, or it was auto-rejected because nobody accepted it before acceptBy; order-service cancels it and the customer is refunded. Producer: vendor-service, topic vendor.events, key orderId (outbox aggregate type VendorOrder).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that received the order."},
+    {"name": "reason", "type": "string", "doc": "Rejection reason. One of: OUT_OF_STOCK, STORE_CLOSED, TOO_BUSY, OTHER, NO_RESPONSE (automatic)."},
+    {"name": "note", "type": ["null", "string"], "default": null, "doc": "Free-text explanation from the vendor; null if none."},
+    {"name": "auto", "type": "boolean", "doc": "True when the order was rejected automatically at the acceptance deadline."},
+    {"name": "rejectedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order was rejected (UTC)."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User id of the vendor user who rejected; null for an automatic rejection."}
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "SecurityEventRecorded",
+  "namespace": "com.grocery.events.identity",
+  "doc": "One row of identity-service's sign-in and account audit (auth_audit): sign-ins, failures, lockouts, sign-outs, password changes and resets, suspensions, new admins. Producer: identity-service, topic identity.events, key recordId (a record stands alone: no order between records is needed). reporting-service keeps it in the central audit trail; nothing else consumes it.",
+  "fields": [
+    {"name": "recordId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the auth_audit row."},
+    {"name": "type", "type": "string", "doc": "What happened. One of: REGISTERED, LOGIN_SUCCESS, LOGIN_FAILURE, LOGIN_LOCKED, LOGIN_SUSPENDED, REFRESH_REUSE_DETECTED, LOGOUT, USER_SUSPENDED, USER_REACTIVATED, ADMIN_CREATED, PASSWORD_CHANGED, PASSWORD_CHANGE_FAILURE, PASSWORD_RESET_REQUESTED, PASSWORD_RESET_IGNORED, PASSWORD_RESET, PASSWORD_RESET_FAILURE (new types may be added)."},
+    {"name": "userId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "The account concerned; null when none is known (a sign-in with an unknown e-mail)."},
+    {"name": "email", "type": ["null", "string"], "default": null, "doc": "The account's e-mail, or the e-mail typed in; null if none."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "The admin who acted on the account (USER_SUSPENDED, USER_REACTIVATED, ADMIN_CREATED); null when the account holder (or nobody signed in) acted."},
+    {"name": "detail", "type": ["null", "string"], "default": null, "doc": "Short detail, e.g. the failure reason or the suspension reason; never a password or token."},
+    {"name": "ipAddress", "type": ["null", "string"], "default": null, "doc": "The client's IP address as identity-service saw it."},
+    {"name": "userAgent", "type": ["null", "string"], "default": null, "doc": "The client's User-Agent, at most 255 characters."},
+    {"name": "occurredAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When it happened (UTC)."}
+  ]
+}

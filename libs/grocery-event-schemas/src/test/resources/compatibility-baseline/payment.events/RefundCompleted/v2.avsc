@@ -1,0 +1,74 @@
+{
+  "type": "record",
+  "name": "RefundCompleted",
+  "namespace": "com.grocery.events.payment",
+  "doc": "A refund was processed by the provider. Producer: payment-service, topic payment.events, key orderId. Consumer: order-service.",
+  "fields": [
+    {
+      "name": "orderId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the order (message key)."
+    },
+    {
+      "name": "paymentId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the refunded payment."
+    },
+    {
+      "name": "refundId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the refund."
+    },
+    {
+      "name": "amount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Amount of this refund, 2 decimals."
+    },
+    {
+      "name": "reason",
+      "type": "string",
+      "doc": "Refund reason. One of: ORDER_CANCELLED, LATE_CAPTURE, ADMIN."
+    },
+    {
+      "name": "totalRefunded",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Everything refunded for the payment so far, including this refund, 2 decimals."
+    },
+    {
+      "name": "fullyRefunded",
+      "type": "boolean",
+      "doc": "True when nothing of the captured amount is left."
+    },
+    {
+      "name": "returnId",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null,
+      "doc": "The return this refund is for (reason RETURN, Phase 12); null for other refunds."
+    }
+  ]
+}

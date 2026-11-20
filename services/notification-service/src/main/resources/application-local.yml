@@ -1,0 +1,13 @@
+# Run from the IDE while everything else runs in Docker:
+#   docker compose stop notification-service   (in infrastructure/local), then run NotificationServiceApplication with
+#   profile "local": MySQL on localhost:3307, Redis on localhost:6379, Kafka on localhost:9092, identity JWKS on
+#   localhost:8101.
+grocery:
+  notification:
+    instance-id: ide
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.grocery: DEBUG

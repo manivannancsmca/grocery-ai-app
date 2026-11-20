@@ -1,0 +1,13 @@
+# Terraform working directories and local state (bootstrap keeps its state locally: back it up, never commit it)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# validate.sh scratch output
+.validate/

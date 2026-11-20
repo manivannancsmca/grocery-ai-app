@@ -1,0 +1,8 @@
+// grocery-web: lint, type check, tests, build, scans, image, then S3 + CloudFront per environment
+// (contract Phase 14 §6 "Frontend pipeline"). Stages and parameters: infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryFrontendPipeline(
+    app: 'grocery-web',              // ECR grocery/grocery-web (the nginx image for non-AWS targets)
+    dir: 'frontend/grocery-web'
+)

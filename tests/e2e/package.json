@@ -1,0 +1,20 @@
+{
+  "name": "grocery-e2e",
+  "private": true,
+  "version": "0.13.0",
+  "description": "Phase 13 end-to-end UI journeys (Playwright, Chromium) against the running local stack",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "report": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  }
+}

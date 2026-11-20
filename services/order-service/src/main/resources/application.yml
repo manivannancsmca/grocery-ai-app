@@ -1,0 +1,126 @@
+# Defaults = running from the IDE against the Dockerised infrastructure (profile "local").
+server:
+  port: 8110
+  shutdown: graceful
+
+grocery:
+  # Admin platform settings (docs/api/platform-settings.md): order.returns.window and decision-timeout below are the
+  # defaults of the returns area; an admin's saved value overrides them. Each instance re-reads them at most this often.
+  settings:
+    cache-ttl: ${PLATFORM_SETTINGS_CACHE_TTL:15s}
+  approvals:
+    enabled: true          # Phase 11: verify X-Approval-Token on AI-approved calls (JWKS from APPROVAL_JWKS_URI)
+  order:
+    payment-window: ${ORDER_PAYMENT_WINDOW:15m}   # shown as payment.dueAt; payment-service expires the payment then
+    timezone: Asia/Kolkata                        # the day boundaries of the admin stats and date filters
+    http:
+      connect-timeout: 1s
+      read-timeout: 5s                            # the preview itself calls up to six services
+    services:
+      cart: ${CART_SERVICE_URL:http://localhost:8109}
+      pricing: ${PRICING_SERVICE_URL:http://localhost:8108}    # Phase 12: POST /internal/coupons/redeem at placement
+    # One breaker per dependency, cart and pricing (count-based window; 4xx answers never count).
+    circuit-breaker:
+      sliding-window-size: 20
+      minimum-number-of-calls: 10
+      failure-rate-threshold: 50
+      wait-duration-in-open-state: 10s
+      permitted-calls-in-half-open-state: 3
+    # Phase 10: the stuck-order watchdog (docs/api/phase-10-event-driven-hardening.md §4); safe in every replica
+    watchdog:
+      interval: ${ORDER_WATCHDOG_INTERVAL:1m}                     # pause between two runs (fixed delay)
+      created-after: ${ORDER_STUCK_CREATED_AFTER:2m}               # CREATED → STOCK_CHECK_OVERDUE
+      payment-grace: ${ORDER_STUCK_PAYMENT_GRACE:2m}               # AWAITING_PAYMENT past payment.dueAt → PAYMENT_EXPIRY_OVERDUE
+      confirmed-after: ${ORDER_STUCK_CONFIRMED_AFTER:15m}          # CONFIRMED → STORE_RESPONSE_OVERDUE
+      preparation-grace: ${ORDER_STUCK_PREPARATION_GRACE:30m}      # ACCEPTED / PREPARING past readyBy → PREPARATION_OVERDUE
+      pickup-after: ${ORDER_STUCK_PICKUP_AFTER:30m}                # READY_FOR_PICKUP → PICKUP_OVERDUE
+      delivery-after: ${ORDER_STUCK_DELIVERY_AFTER:90m}            # OUT_FOR_DELIVERY → DELIVERY_OVERDUE
+      batch-size: 100
+    # Phase 12: returns (docs/api/phase-12-post-mvp-features.md §3); the escalation poller is safe in every replica
+    returns:
+      window: ${ORDER_RETURN_WINDOW:48h}                           # a DELIVERED order can be returned until deliveredAt + this
+      decision-timeout: ${RETURN_DECISION_TIMEOUT:24h}             # the store decides by requestedAt + this, then the admins
+      escalation-interval: ${RETURN_ESCALATION_INTERVAL:1m}        # pause between two escalation runs (fixed delay)
+      batch-size: 100
+    # Complaints (docs/api/payment-and-support-agents.md §2)
+    complaints:
+      max-open: ${ORDER_COMPLAINTS_MAX_OPEN:5}                     # open (OPEN / IN_PROGRESS) complaints per customer
+
+spring:
+  application:
+    name: order-service
+  # MCP pilot (2026-11-20): a customer's order status as an MCP tool for MCP clients acting for a signed-in user (the shopping
+  # assistant first). Stateless Streamable HTTP: every POST stands alone (no session), so any replica answers it, and
+  # the tool runs on the request's thread with the caller's verified token. Not a public path: a token is required.
+  ai:
+    mcp:
+      server:
+        name: order-service
+        version: 1.0.0
+        protocol: STATELESS
+        type: SYNC
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
+        streamable-http:
+          mcp-endpoint: /api/mcp/orders
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/order_db?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC
+    username: ${DB_USERNAME:order_user}
+    password: ${DB_PASSWORD:order_pass}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.default_batch_fetch_size: 100
+      hibernate.jdbc.batch_size: 50
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
+  cloud:
+    circuitbreaker:
+      resilience4j:
+        # Calls run on the request's (virtual) thread; the HTTP read timeout bounds them.
+        disable-thread-pool: true
+        disable-time-limiter: true
+      bulkhead:
+        resilience4j:
+          enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+    listener:
+      auto-startup: ${KAFKA_LISTENERS_ENABLED:true}
+  # Zero trust: this service validates every JWT itself (signature via identity JWKS, issuer, audience).
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://localhost:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://identity.grocery.local}
+          audiences: grocery-api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+info:
+  service: order-service
+  phase: 12

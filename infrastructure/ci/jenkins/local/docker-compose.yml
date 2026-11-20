@@ -1,0 +1,86 @@
+# =====================================================================================================================
+# Local validation Jenkins (contract Phase 14 §6 "Local validation"), its own compose project: grocery-ci.
+#   cd infrastructure/ci/jenkins/local
+#   export JENKINS_ADMIN_PASSWORD=...        # or put it in .env (see .env.example; .env is git-ignored)
+#   docker compose up -d --build             # Jenkins on http://localhost:8190, registry on localhost:5000
+#   bash lint.sh                             # declarative linter over every Jenkinsfile (+ --load)
+#   bash run-pipeline.sh services/pricing-service --approve
+#   docker compose down                      # add -v to drop Jenkins home, the registry and the CI caches
+#
+# - jenkins: pinned LTS + pinned plugins (Dockerfile, plugins.txt), configured as code (casc/), one job per
+#   Jenkinsfile (jobs/jobs.groovy). The repository is mounted read-only at /repo; pipelines copy it into their
+#   workspace. Steps run in sibling containers through the Docker socket (see the security note in the README).
+# - registry: registry:2 standing in for ECR. The Docker daemon pushes to localhost:${CI_REGISTRY_PORT}.
+# Memory: Jenkins ≤ 1.5 GB; each pipeline step container has its own limit (Maven/npm 3 GB, Trivy 2 GB).
+# =====================================================================================================================
+name: grocery-ci
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grocery-ci/jenkins:2.580.2-lts-jdk21
+    container_name: grocery-ci-jenkins      # the pipelines' step containers use --volumes-from grocery-ci-jenkins
+    restart: unless-stopped
+    mem_limit: 1536m
+    # the Docker socket is root:root 660 on Docker Desktop; on a Linux host set DOCKER_GID=$(stat -c %g /var/run/docker.sock)
+    group_add:
+      - "${DOCKER_GID:-0}"
+    environment:
+      JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID:-admin}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:?set JENKINS_ADMIN_PASSWORD (environment or .env, see .env.example)}
+      CASC_JENKINS_CONFIG: /repo/infrastructure/ci/jenkins/local/casc
+      GROCERY_LOCAL_REPO: /repo
+      CI_REGISTRY_PORT: ${CI_REGISTRY_PORT:-5000}
+      JENKINS_PORT: ${JENKINS_PORT:-8190}
+      DOCKER_GID: ${DOCKER_GID:-0}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:${JENKINS_PORT:-8190}:8080"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - ../../../..:/repo:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      # created here so `docker compose down -v` also removes them; the pipelines mount them by name
+      - m2:/caches/m2
+      - npm:/caches/npm
+      - trivy:/caches/trivy
+    depends_on:
+      registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost:8080/login || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  registry:
+    image: registry:2.8.3
+    container_name: grocery-ci-registry
+    restart: unless-stopped
+    mem_limit: 128m
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${CI_REGISTRY_PORT:-5000}:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:5000/v2/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  jenkins-home:
+    name: grocery-ci-jenkins-home
+  registry-data:
+    name: grocery-ci-registry-data
+  m2:
+    name: grocery-ci-m2
+  npm:
+    name: grocery-ci-npm
+  trivy:
+    name: grocery-ci-trivy-cache

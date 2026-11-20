@@ -1,0 +1,115 @@
+{
+  "type": "record",
+  "name": "ApprovalRequested",
+  "namespace": "com.grocery.events.ai",
+  "doc": "An assistant proposed a sensitive action; it waits for a human decision (status PENDING_APPROVAL). Producer: ai-orchestrator-service, topic ai.events, key approvalId.",
+  "fields": [
+    {
+      "name": "approvalId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the approval request (aggregate id and message key)."
+    },
+    {
+      "name": "action",
+      "type": "string",
+      "doc": "The proposed action. One of: PLACE_ORDER, CANCEL_ORDER, REQUEST_RETURN, REFUND_PAYMENT, ADMIN_CANCEL_ORDER, SUSPEND_VENDOR, SUSPEND_RESTAURANT, ADJUST_STOCK, CHANGE_PRICE, SEND_PURCHASE_ORDER, SET_MENU_ITEM_AVAILABILITY, ACCEPT_STORE_ORDER, REJECT_STORE_ORDER, REASSIGN_DELIVERY."
+    },
+    {
+      "name": "agent",
+      "type": "string",
+      "doc": "The assistant that proposed it. One of: shopping, admin-bi, vendor, restaurant, delivery."
+    },
+    {
+      "name": "requestedBy",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "User who was chatting with the assistant when it proposed the action."
+    },
+    {
+      "name": "onBehalfOf",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null,
+      "doc": "Customer the action is for (PLACE_ORDER, CANCEL_ORDER, REQUEST_RETURN: the requester); null for store, delivery and admin actions."
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "doc": "Server-rendered one-line summary, e.g. 'Place order: 2 items from Fresh Mart, total 285.00 INR'."
+    },
+    {
+      "name": "approverUserId",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null,
+      "doc": "The one user who must decide (the customer, for their own order); null = any user with one of approverRoles."
+    },
+    {
+      "name": "approverRoles",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "doc": "Roles allowed to decide when approverUserId is null, e.g. FINANCE_ADMIN, SUPER_ADMIN; empty when approverUserId is set."
+    },
+    {
+      "name": "fourEyes",
+      "type": "boolean",
+      "doc": "True when the requester may not approve it themselves."
+    },
+    {
+      "name": "amount",
+      "type": [
+        "null",
+        {
+          "type": "bytes",
+          "logicalType": "decimal",
+          "precision": 12,
+          "scale": 2
+        }
+      ],
+      "default": null,
+      "doc": "Money involved (order total, refund amount), 2 decimals; null when none."
+    },
+    {
+      "name": "currency",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "ISO currency of amount (INR); null when amount is null."
+    },
+    {
+      "name": "expiresAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When the request expires if nobody decides (UTC)."
+    },
+    {
+      "name": "requestedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When the assistant proposed it (UTC)."
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "type": "record",
+  "name": "RatingSummaryUpdated",
+  "namespace": "com.grocery.events.review",
+  "doc": "The published rating summary of one target changed (a review was published, edited, rejected, removed or deleted). Producer: review-service, topic review.events, key targetId.",
+  "fields": [
+    {
+      "name": "targetType",
+      "type": "string",
+      "doc": "What is reviewed. One of: PRODUCT, MENU_ITEM, VENDOR, RESTAURANT, DELIVERY_PARTNER."
+    },
+    {
+      "name": "targetId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the target (message key)."
+    },
+    {
+      "name": "averageRating",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 3,
+        "scale": 2
+      },
+      "doc": "Average of the published ratings, 2 decimals (0.00 when ratingCount is 0)."
+    },
+    {
+      "name": "ratingCount",
+      "type": "int",
+      "doc": "Number of published reviews."
+    },
+    {
+      "name": "ratingDistribution",
+      "type": {
+        "type": "array",
+        "items": "int"
+      },
+      "doc": "Published reviews per star, index 0 = 1 star ... index 4 = 5 stars."
+    },
+    {
+      "name": "summaryVersion",
+      "type": "long",
+      "doc": "Increases with every change of this target's summary; consumers ignore older versions."
+    },
+    {
+      "name": "updatedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When the summary changed (UTC)."
+    }
+  ]
+}

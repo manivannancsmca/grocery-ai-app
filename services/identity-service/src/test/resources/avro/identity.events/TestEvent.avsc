@@ -1,0 +1,9 @@
+{
+  "type": "record",
+  "name": "TestEvent",
+  "namespace": "com.grocery.events.identity",
+  "doc": "TEST ONLY (src/test/resources, never in the service jar or libs/grocery-event-schemas): the placeholder event PlatformFoundationIntegrationTest publishes to test the outbox itself. With Avro on (ADR-0011) every outbox event needs a schema on the classpath.",
+  "fields": [
+    {"name": "role", "type": ["null", "string"], "default": null, "doc": "Any role name; absent in the rollback and no-transaction tests."}
+  ]
+}

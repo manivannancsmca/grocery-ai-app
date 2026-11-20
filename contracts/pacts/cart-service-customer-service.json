@@ -1,0 +1,465 @@
+{
+  "consumer": {
+    "name": "cart-service"
+  },
+  "interactions": [
+    {
+      "description": "a request for an address the customer does not have",
+      "key": "ea2e815a",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the address is not one of the customer's",
+          "params": {
+            "addressId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a9",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/api/customers/me/addresses/0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a9"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "errorCode": "ADDRESS_NOT_FOUND"
+          },
+          "contentType": "application/problem+json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/problem+json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/problem\\+json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 404
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a request for all the customer's addresses",
+      "key": "eea35eb7",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the customer has a default address with a location",
+          "params": {
+            "addressId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/api/customers/me/addresses"
+      },
+      "response": {
+        "body": {
+          "content": [
+            {
+              "city": "Bengaluru",
+              "id": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+              "isDefault": true,
+              "label": "Home",
+              "landmark": "Near the metro station",
+              "latitude": 12.9784,
+              "line1": "12, 4th Cross, HAL 2nd Stage",
+              "line2": "Indiranagar",
+              "longitude": 77.6408,
+              "phone": "+919800000001",
+              "postalCode": "560038",
+              "recipientName": "Asha Rao",
+              "state": "Karnataka"
+            }
+          ],
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$[*].city": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$[*].isDefault": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].landmark": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].latitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$[*].line1": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].line2": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].longitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$[*].phone": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].postalCode": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].recipientName": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].state": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a request for one of the customer's addresses",
+      "key": "1d54bd6d",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the customer has a default address with a location",
+          "params": {
+            "addressId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/api/customers/me/addresses/0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "city": "Bengaluru",
+            "id": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6a1",
+            "isDefault": true,
+            "label": "Home",
+            "landmark": "Near the metro station",
+            "latitude": 12.9784,
+            "line1": "12, 4th Cross, HAL 2nd Stage",
+            "line2": "Indiranagar",
+            "longitude": 77.6408,
+            "phone": "+919800000001",
+            "postalCode": "560038",
+            "recipientName": "Asha Rao",
+            "state": "Karnataka"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.city": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.isDefault": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.landmark": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.latitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.line1": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.line2": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.longitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.phone": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.postalCode": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.recipientName": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.state": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.7"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "customer-service"
+  }
+}

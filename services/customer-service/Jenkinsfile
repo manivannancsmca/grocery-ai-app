@@ -1,0 +1,11 @@
+// customer-service: build, test, scan, image and deploy this service on its own (contract Phase 14 §6).
+// Stages, parameters (DRY_RUN, VALIDATE_ONLY) and options: infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryServicePipeline(
+    service: 'customer-service',
+    port: 8102,
+    producesEvents: true,    // outbox -> Debezium (CustomerProfileUpdated): register its schemas before each deployment
+    hasContracts: true,      // Pact provider: verifies contracts/pacts/*-customer-service.json
+    testcontainers: true
+)

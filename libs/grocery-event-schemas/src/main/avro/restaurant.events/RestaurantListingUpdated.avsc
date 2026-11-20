@@ -1,0 +1,68 @@
+{
+  "type": "record",
+  "name": "RestaurantListingUpdated",
+  "namespace": "com.grocery.events.restaurant",
+  "doc": "The complete public listing of a restaurant that was ever approved: profile, address, opening hours, accepting-orders switch and the whole menu. Published on approval, suspension, reinstatement, every menu change, the accepting-orders switch and republish. Producer: restaurant-service, topic restaurant.events, key restaurantId. Consumer: catalog-query (listingVersion is the search index's external version).",
+  "fields": [
+    {"name": "restaurantId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the restaurant (aggregate id and message key)."},
+    {"name": "ownerUserId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the restaurant's owner."},
+    {"name": "status", "type": "string", "doc": "Restaurant status. APPROVED or SUSPENDED (search shows only APPROVED); the Java enum also has DRAFT, PENDING_APPROVAL, REJECTED."},
+    {"name": "name", "type": ["null", "string"], "default": null, "doc": "Restaurant name; null if the profile has none."},
+    {"name": "description", "type": ["null", "string"], "default": null, "doc": "Restaurant description; null if none."},
+    {"name": "cuisines", "type": {"type": "array", "items": "string"}, "doc": "Cuisine codes in the owner's order, e.g. NORTH_INDIAN; may be empty."},
+    {"name": "address", "type": ["null", {
+      "type": "record",
+      "name": "RestaurantListingUpdatedAddress",
+      "doc": "The restaurant's business address and pickup location.",
+      "fields": [
+        {"name": "line1", "type": ["null", "string"], "default": null, "doc": "Address line 1."},
+        {"name": "line2", "type": ["null", "string"], "default": null, "doc": "Address line 2."},
+        {"name": "city", "type": ["null", "string"], "default": null, "doc": "City."},
+        {"name": "state", "type": ["null", "string"], "default": null, "doc": "State."},
+        {"name": "postalCode", "type": ["null", "string"], "default": null, "doc": "Postal code."},
+        {"name": "country", "type": ["null", "string"], "default": null, "doc": "ISO 3166-1 alpha-2 country code, e.g. IN."},
+        {"name": "latitude", "type": ["null", "double"], "default": null, "doc": "Latitude of the pickup location (WGS84 degrees)."},
+        {"name": "longitude", "type": ["null", "double"], "default": null, "doc": "Longitude of the pickup location (WGS84 degrees)."}
+      ]
+    }], "default": null, "doc": "Business address; null when the restaurant has no address."},
+    {"name": "openingHours", "type": {"type": "array", "items": {
+      "type": "record",
+      "name": "RestaurantListingUpdatedHours",
+      "doc": "Opening hours of one day of the week.",
+      "fields": [
+        {"name": "dayOfWeek", "type": "string", "doc": "Day of the week. One of: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY."},
+        {"name": "opensAt", "type": "string", "doc": "Opening time, local time as HH:mm."},
+        {"name": "closesAt", "type": "string", "doc": "Closing time, local time as HH:mm; earlier than opensAt = closes after midnight."}
+      ]
+    }}, "doc": "Opening hours sorted by day of week (MONDAY first); days without an entry are closed."},
+    {"name": "acceptingOrders", "type": "boolean", "doc": "The owner's accepting-orders switch."},
+    {"name": "menu", "type": {"type": "array", "items": {
+      "type": "record",
+      "name": "RestaurantListingUpdatedCategory",
+      "doc": "One menu category with its items.",
+      "fields": [
+        {"name": "categoryId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the menu category."},
+        {"name": "name", "type": "string", "doc": "Category name."},
+        {"name": "description", "type": ["null", "string"], "default": null, "doc": "Category description; null if none."},
+        {"name": "sortOrder", "type": "int", "doc": "Sort order (0-9999, lower first; ties sorted by name)."},
+        {"name": "items", "type": {"type": "array", "items": {
+          "type": "record",
+          "name": "RestaurantListingUpdatedItem",
+          "doc": "One menu item; unavailable items are included with available = false.",
+          "fields": [
+            {"name": "itemId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the menu item."},
+            {"name": "name", "type": "string", "doc": "Item name."},
+            {"name": "description", "type": ["null", "string"], "default": null, "doc": "Item description; null if none."},
+            {"name": "price", "type": {"type": "bytes", "logicalType": "decimal", "precision": 10, "scale": 2}, "doc": "Price in INR with 2 decimals (column DECIMAL(10,2))."},
+            {"name": "foodType", "type": "string", "doc": "Food type. One of: VEG, NON_VEG, EGG."},
+            {"name": "imageUrl", "type": ["null", "string"], "default": null, "doc": "Image URL; null if none."},
+            {"name": "available", "type": "boolean", "doc": "False when the item is currently unavailable."},
+            {"name": "sortOrder", "type": "int", "doc": "Sort order within the category (lower first; ties sorted by name)."}
+          ]
+        }}, "doc": "The category's items, sorted by sortOrder, then name; may be empty."}
+      ]
+    }}, "doc": "The full menu: categories sorted by sortOrder, then name (empty categories included)."},
+    {"name": "listingVersion", "type": "long", "doc": "Strictly increasing per restaurant with every change; a republish re-sends the current version unchanged."},
+    {"name": "updatedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the listing last changed (UTC)."}
+  ]
+}

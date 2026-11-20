@@ -1,0 +1,46 @@
+# =====================================================================================
+# Alertmanager — local: every alert is emailed to ops@grocery.local through Mailpit (mailpit:1025, no TLS/auth),
+# visible at http://localhost:8025. In AWS (Phase 14) the same routing goes to SNS.
+# Grouping by alertname + service; critical repeats every hour, warning every 4 h, info every 24 h.
+# Validate: infrastructure/local/observability/validate.sh  (amtool check-config)
+# =====================================================================================
+global:
+  smtp_smarthost: mailpit:1025
+  smtp_from: alertmanager@grocery.local
+  smtp_hello: alertmanager.grocery.local
+  smtp_require_tls: false
+  resolve_timeout: 5m
+
+route:
+  receiver: ops-email
+  group_by: [alertname, service]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - receiver: ops-email
+      matchers: [severity="critical"]
+      repeat_interval: 1h
+    - receiver: ops-email
+      matchers: [severity="warning"]
+      repeat_interval: 4h
+    - receiver: ops-email
+      matchers: [severity="info"]
+      repeat_interval: 24h
+
+inhibit_rules:
+  # A service that is down produces errors, lag and dead letters elsewhere: mail only the ServiceDown alert for it.
+  - source_matchers: [alertname="ServiceDown"]
+    target_matchers: [severity=~"warning|info"]
+    equal: [service]
+  # MySQL down makes every service with a database fail its health checks; the root cause is enough.
+  - source_matchers: [alertname="DatabaseDown"]
+    target_matchers: [alertname=~"HighErrorRate|SlowRequests|ConnectorTaskFailed"]
+
+receivers:
+  - name: ops-email
+    email_configs:
+      - to: ops@grocery.local
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}{{ with .CommonLabels.service }} · {{ . }}{{ end }} ({{ .CommonLabels.severity }})'

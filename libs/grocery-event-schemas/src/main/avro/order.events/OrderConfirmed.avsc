@@ -1,0 +1,352 @@
+{
+  "type": "record",
+  "name": "OrderConfirmed",
+  "namespace": "com.grocery.events.order",
+  "doc": "The order was paid (AWAITING_PAYMENT -> CONFIRMED). Producer: order-service, topic order.events, key orderId. Consumers: inventory (holds the stock until pickup); vendor, restaurant and notification later.",
+  "fields": [
+    {
+      "name": "orderId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the order (message key)."
+    },
+    {
+      "name": "orderNumber",
+      "type": "string",
+      "doc": "Human-readable order number."
+    },
+    {
+      "name": "orderType",
+      "type": "string",
+      "doc": "Store type of the order. One of: GROCERY, RESTAURANT."
+    },
+    {
+      "name": "customerId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the customer."
+    },
+    {
+      "name": "storeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."
+    },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "OrderConfirmedItem",
+          "doc": "One order line.",
+          "fields": [
+            {
+              "name": "itemId",
+              "type": {
+                "type": "string",
+                "logicalType": "uuid"
+              },
+              "doc": "productId (type PRODUCT) or menuItemId (type MENU_ITEM)."
+            },
+            {
+              "name": "type",
+              "type": "string",
+              "doc": "Line type. One of: PRODUCT, MENU_ITEM."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "doc": "Item name at ordering time."
+            },
+            {
+              "name": "quantity",
+              "type": "int",
+              "doc": "Ordered quantity (> 0)."
+            },
+            {
+              "name": "unitPrice",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              },
+              "doc": "Unit price in the order currency, 2 decimals."
+            },
+            {
+              "name": "lineTotal",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              },
+              "doc": "Line total in the order currency, 2 decimals."
+            }
+          ]
+        }
+      },
+      "doc": "The order lines."
+    },
+    {
+      "name": "total",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Order total, 2 decimals."
+    },
+    {
+      "name": "deliveryAddress",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "OrderConfirmedAddress",
+          "doc": "Snapshot of the delivery address taken when the order was placed.",
+          "fields": [
+            {
+              "name": "label",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Address label, e.g. Home."
+            },
+            {
+              "name": "recipientName",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Recipient name."
+            },
+            {
+              "name": "phone",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Recipient phone."
+            },
+            {
+              "name": "line1",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Address line 1."
+            },
+            {
+              "name": "line2",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Address line 2."
+            },
+            {
+              "name": "landmark",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Landmark."
+            },
+            {
+              "name": "city",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "City."
+            },
+            {
+              "name": "state",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "State."
+            },
+            {
+              "name": "postalCode",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Postal code."
+            },
+            {
+              "name": "latitude",
+              "type": [
+                "null",
+                "double"
+              ],
+              "default": null,
+              "doc": "Latitude (WGS84 degrees)."
+            },
+            {
+              "name": "longitude",
+              "type": [
+                "null",
+                "double"
+              ],
+              "default": null,
+              "doc": "Longitude (WGS84 degrees)."
+            }
+          ]
+        }
+      ],
+      "default": null,
+      "doc": "Delivery address; null if the order has none stored."
+    },
+    {
+      "name": "confirmedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When the order was confirmed (UTC)."
+    },
+    {
+      "name": "subtotal",
+      "type": [
+        "null",
+        {
+          "type": "bytes",
+          "logicalType": "decimal",
+          "precision": 12,
+          "scale": 2
+        }
+      ],
+      "default": null,
+      "doc": "Sum of the line totals (the store's sales before the delivery fee), INR; added in Phase 8, null in older events."
+    },
+    {
+      "name": "note",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "The customer's delivery note; added in Phase 8, null if none or in older events."
+    },
+    {
+      "name": "storeLocation",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "OrderConfirmedStoreLocation",
+          "doc": "Where the order is picked up, snapshotted from the checkout preview.",
+          "fields": [
+            {
+              "name": "name",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Store name; null if unknown."
+            },
+            {
+              "name": "city",
+              "type": [
+                "null",
+                "string"
+              ],
+              "default": null,
+              "doc": "Store city; null if unknown."
+            },
+            {
+              "name": "latitude",
+              "type": "double",
+              "doc": "Store latitude, WGS84 degrees."
+            },
+            {
+              "name": "longitude",
+              "type": "double",
+              "doc": "Store longitude, WGS84 degrees."
+            }
+          ]
+        }
+      ],
+      "default": null,
+      "doc": "The store's pickup location (added in Phase 9); null in older events or when the store has no location."
+    },
+    {
+      "name": "couponCode",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Coupon applied to the order (Phase 12); null when none."
+    },
+    {
+      "name": "discount",
+      "type": [
+        "null",
+        {
+          "type": "bytes",
+          "logicalType": "decimal",
+          "precision": 12,
+          "scale": 2
+        }
+      ],
+      "default": null,
+      "doc": "Discount on the items from the coupon, 2 decimals (Phase 12); null when none."
+    },
+    {
+      "name": "deliveryFeeDiscount",
+      "type": [
+        "null",
+        {
+          "type": "bytes",
+          "logicalType": "decimal",
+          "precision": 12,
+          "scale": 2
+        }
+      ],
+      "default": null,
+      "doc": "Discount on the delivery fee (FREE_DELIVERY coupons), 2 decimals (Phase 12); null when none."
+    },
+    {
+      "name": "couponName",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Name of the coupon at ordering time, e.g. 'Welcome offer'; null when none, and in orders placed before 1.7.0."
+    },
+    {
+      "name": "couponFundedBy",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Who funds the coupon's discounts: the coupon's scope at ordering time (1.7.0). One of: PLATFORM, STORE; null when none, and in orders placed before 1.7.0."
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "LowStockDetected",
+  "namespace": "com.grocery.events.inventory",
+  "doc": "The available quantity dropped from above the product's low-stock threshold to the threshold or below (threshold > 0). Producer: inventory-service, topic inventory.events (aggregate Stock), key productId.",
+  "fields": [
+    {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product (message key)."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that owns the stock."},
+    {"name": "productName", "type": ["null", "string"], "default": null, "doc": "Product name from inventory's product projection; null when the product is not known there."},
+    {"name": "available", "type": "int", "doc": "Available quantity after the change."},
+    {"name": "threshold", "type": "int", "doc": "The product's low-stock threshold (> 0)."}
+  ]
+}

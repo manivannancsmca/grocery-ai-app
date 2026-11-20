@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "PaymentCapturedV2",
+  "namespace": "com.grocery.events.test",
+  "doc": "Test schema (grocery-common tests only): eventVersion 2 of PaymentCaptured, a breaking change.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "amountMinor", "type": "long"},
+    {"name": "capturedAt", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+  ]
+}

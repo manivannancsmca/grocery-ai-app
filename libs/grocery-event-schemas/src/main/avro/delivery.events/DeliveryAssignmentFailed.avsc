@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "DeliveryAssignmentFailed",
+  "namespace": "com.grocery.events.delivery",
+  "doc": "No partner accepted the delivery within the largest search radius; it keeps being retried and delivery managers are alerted to assign one by hand. Published once per delivery. Producer: delivery-service, topic delivery.events, key orderId (outbox aggregate type Delivery).",
+  "fields": [
+    {"name": "deliveryId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery."},
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "attempts", "type": "int", "doc": "Number of offers sent so far."},
+    {"name": "radiusKm", "type": "double", "doc": "The largest search radius tried, km."},
+    {"name": "failedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the search was declared failed (UTC)."}
+  ]
+}

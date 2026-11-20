@@ -1,0 +1,75 @@
+{
+  "type": "record",
+  "name": "ReviewModerated",
+  "namespace": "com.grocery.events.review",
+  "doc": "An admin decided a review: PUBLISHED (a flagged one), REJECTED (a flagged one) or REMOVED (a published one). Producer: review-service, topic review.events, key reviewId.",
+  "fields": [
+    {
+      "name": "reviewId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the review (message key)."
+    },
+    {
+      "name": "targetType",
+      "type": "string",
+      "doc": "What is reviewed. One of: PRODUCT, MENU_ITEM, VENDOR, RESTAURANT, DELIVERY_PARTNER."
+    },
+    {
+      "name": "targetId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the product, menu item, vendor, restaurant or delivery partner."
+    },
+    {
+      "name": "storeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "vendorId or restaurantId of the order the review comes from (the store that is notified)."
+    },
+    {
+      "name": "customerId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "The reviewing customer."
+    },
+    {
+      "name": "decision",
+      "type": "string",
+      "doc": "One of: PUBLISHED, REJECTED, REMOVED."
+    },
+    {
+      "name": "reason",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "The admin's reason (required for REJECTED and REMOVED); null otherwise."
+    },
+    {
+      "name": "moderatorId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "The admin who decided."
+    },
+    {
+      "name": "moderatedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When it was decided (UTC)."
+    }
+  ]
+}

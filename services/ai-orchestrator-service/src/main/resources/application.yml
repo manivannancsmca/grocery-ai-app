@@ -1,0 +1,160 @@
+# Defaults = running from the IDE against the Dockerised infrastructure (profile "local").
+server:
+  port: 8115
+  shutdown: graceful
+
+grocery:
+  ai:
+    # ollama (default: the local model) | anthropic (production: Claude) | scripted (deterministic stand-in, only with
+    # the "local" or "docker" profile; contract §7)
+    provider: ${AI_PROVIDER:ollama}
+    # Tools and approval execution reach the business APIs only through the gateway, with the user's own token.
+    gateway-url: ${GROCERY_AI_GATEWAY_URL:http://localhost:8080}
+    tool-timeout: 5s
+    # Longest wait for the model's next token (streaming) or answer (insights); CPU inference is slow.
+    model-timeout: ${AI_MODEL_TIMEOUT:120s}
+    messages-per-hour: ${AI_MESSAGES_PER_HOUR:30}
+    max-tool-calls: 6
+    memory-messages: 20
+    # "add 2 basmati rice", "show my cart", "remove the tomatoes", "checkout", "place my order": handled in code before
+    # the model (ShoppingCommands). The local 4B model often skips the cart tools late in a conversation.
+    shopping-commands: ${AI_SHOPPING_COMMANDS:true}
+    # MCP pilot: searchProducts and getOrderStatus reach catalog-query and order-service as MCP tools (through the
+    # gateway, with the user's token); a server that cannot be reached falls back to the REST API for that call.
+    mcp:
+      enabled: ${AI_MCP_ENABLED:true}
+      catalog-path: /api/mcp/catalog
+      orders-path: /api/mcp/orders
+    status-cache-ttl: 30s
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_MODEL:qwen3:4b-instruct}
+      # The model's context window (num_ctx). Ollama's default, 4096, is too small for the shopping assistant's prompt,
+      # tools and one tool result. Memory: about 0.6 GB more KV cache than 4096 (see the compose file's ollama service).
+      context-tokens: ${AI_OLLAMA_CONTEXT_TOKENS:8192}
+    # The production model (AI_PROVIDER=anthropic). The key comes from the environment only (AWS: Secrets Manager);
+    # without it the assistants answer AI_UNAVAILABLE.
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      model: ${ANTHROPIC_MODEL:claude-opus-5-5}
+      max-tokens: ${AI_ANTHROPIC_MAX_TOKENS:2048}
+      context-tokens: 100000
+      max-retries: ${AI_ANTHROPIC_MAX_RETRIES:1}
+    approvals:
+      ttl-customer: ${AI_APPROVAL_TTL_CUSTOMER:15m}
+      ttl-admin: ${AI_APPROVAL_TTL_ADMIN:24h}
+      four-eyes-refund-above: ${AI_FOUR_EYES_REFUND_ABOVE:2000.00}
+      expiry-interval: ${AI_APPROVAL_EXPIRY_INTERVAL:30s}
+      executing-timeout: 2m
+      batch-size: 50
+      pollers-enabled: true
+      # RSA private key, unencrypted PKCS#8 PEM. Empty = a key is generated at startup (one local replica only).
+      signing-key: ${AI_APPROVAL_SIGNING_KEY:}
+      token-ttl: 60s
+      issuer: ai-orchestrator-service
+      execution-timeout: ${AI_APPROVAL_EXECUTION_TIMEOUT:10s}
+    # Voice chat (speech to text for questions, text to speech for answers).
+    #   server  = this service calls an OpenAI-compatible audio API (OpenAI, or speaches: compose profile "voice")
+    #   browser = the web app uses the browser's own speech recognition / synthesis (no server setup)
+    #   off     = no voice
+    # Facts the payment and support assistants may tell customers (the rest comes live from the business APIs).
+    customer-care:
+      # How long banks usually take to show a refund (Razorpay normal refunds); empty = say nothing about timing.
+      refund-timeline: ${AI_REFUND_TIMELINE:5–7 working days}
+    voice:
+      mode: ${AI_VOICE_MODE:browser}
+      base-url: ${AI_VOICE_BASE_URL:}                      # including /v1, e.g. http://localhost:8000/v1
+      api-key: ${AI_VOICE_API_KEY:}                        # OpenAI key; empty for a local server
+      transcription-model: ${AI_VOICE_TRANSCRIPTION_MODEL:whisper-1}
+      speech-model: ${AI_VOICE_SPEECH_MODEL:tts-1}
+      speech-voice: ${AI_VOICE_SPEECH_VOICE:alloy}
+      language: ${AI_VOICE_LANGUAGE:}                      # ISO 639-1 (en, hi, ...); empty = detected per recording
+      timeout: ${AI_VOICE_TIMEOUT:30s}
+      max-audio-bytes: 10485760
+      max-recording-seconds: 60
+      max-speech-characters: 4000
+      requests-per-hour: ${AI_VOICE_PER_HOUR:120}
+  security:
+    # The approval-token public keys are fetched by the target services without a token (internal; the gateway does
+    # not route it).
+    public-paths:
+      - /.well-known/approval-jwks.json
+
+spring:
+  application:
+    name: ai-orchestrator-service
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      # Voice recordings: the service's own limit is grocery.ai.voice.max-audio-bytes (10 MB, AUDIO_TOO_LARGE); the
+      # servlet limit sits just above it, and anything larger is AUDIO_TOO_LARGE too (VoiceExceptionAdvice).
+      max-file-size: 11MB
+      max-request-size: 11MB
+  ai:
+    model:
+      # Only the chosen provider's chat model exists (ollama or anthropic); the scripted one replaces them otherwise.
+      chat: ${grocery.ai.provider}
+      embedding: none
+    # No hidden retries around model calls: a down model must fail fast (the chat answers AI_UNAVAILABLE, insights
+    # fall back to rules). Spring AI 2.0 retries only TransientAiException / ResourceAccessException anyway.
+    retry:
+      max-attempts: 0
+    ollama:
+      base-url: ${grocery.ai.ollama.base-url}
+      chat:
+        model: ${grocery.ai.ollama.model}
+        temperature: 0.2
+        think: false
+        num-ctx: ${grocery.ai.ollama.context-tokens}
+      init:
+        pull-model-strategy: never
+    # anthropic: the AnthropicChatModel is built from grocery.ai.anthropic.* (ModelProviderConfig), not from here.
+    chat:
+      memory:
+        repository:
+          jdbc:
+            # The table comes from Flyway (V2__ai_schema.sql), never from schema initialisation.
+            initialize-schema: never
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/ai_db?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC
+    username: ${DB_USERNAME:ai_user}
+    password: ${DB_PASSWORD:ai_pass}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000
+      # Decisions read the row inside their transaction and rely on the optimistic lock; READ COMMITTED makes those
+      # reads see the latest committed state (no REPEATABLE READ snapshot, no gap locks for the SKIP LOCKED claims).
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.default_batch_fetch_size: 100
+  # Zero trust: this service validates every JWT itself (signature via identity JWKS, issuer, audience).
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://localhost:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://identity.grocery.local}
+          audiences: grocery-api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+info:
+  service: ai-orchestrator-service
+  phase: 12

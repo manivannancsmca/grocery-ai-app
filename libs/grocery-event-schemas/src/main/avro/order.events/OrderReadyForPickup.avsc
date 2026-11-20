@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "OrderReadyForPickup",
+  "namespace": "com.grocery.events.order",
+  "doc": "The order is ready for a delivery partner to pick up (status READY_FOR_PICKUP). Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "readyAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order became ready (UTC)."}
+  ]
+}

@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1.7
+# =====================================================================================================================
+# CI runtime image of one Spring Boot service (contract Phase 14 §4). Runtime only: the pipeline builds and tests the
+# jar with Maven first, then passes it in. The multi-stage services/<svc>/Dockerfile files stay for local use.
+#   - eclipse-temurin JRE (pinned), non-root numeric user, layered jar (dependencies change less often than code);
+#   - OCI labels: title/version/revision (git SHA)/created come from build args;
+#   - works with ECS readonlyRootFilesystem (only /tmp is written; ECS mounts a volume there);
+#   - busybox wget is kept for the ECS container health check (wget -qO- .../actuator/health/liveness).
+#
+# Build context: a directory containing only the jar (the pipeline uses .ci/image/), e.g.
+#   docker build -f infrastructure/ci/docker/Dockerfile.service \
+#     --build-arg SERVICE=pricing-service --build-arg PORT=8108 \
+#     --build-arg VERSION=0.12.0 --build-arg REVISION=<git sha> --build-arg CREATED=<RFC 3339 time> \
+#     -t grocery/pricing-service:0.12.0-<shortSha> .ci/image
+# =====================================================================================================================
+ARG JRE_IMAGE=eclipse-temurin:25.0.5_8-jre-alpine
+
+# ----------------------------------------------------------------------------------------------- layer extraction
+# Runs on the build platform: extracting is architecture-independent, so an ARM64 image needs no emulation here.
+FROM --platform=$BUILDPLATFORM ${JRE_IMAGE} AS layers
+WORKDIR /build
+ARG JAR_FILE=app.jar
+COPY ${JAR_FILE} app.jar
+RUN java -Djarmode=tools -jar app.jar extract --layers --launcher --destination extracted \
+ && test -d extracted/dependencies && test -d extracted/application
+
+# ----------------------------------------------------------------------------------------------------- runtime
+FROM ${JRE_IMAGE}
+ARG JRE_IMAGE
+ARG SERVICE=unknown
+ARG PORT=8080
+ARG VERSION=0.0.0-dev
+ARG REVISION=unknown
+ARG CREATED=unknown
+ARG SOURCE=unknown
+# Security fixes of the base image's OS packages published after the pinned tag (the Trivy image gate fails on
+# HIGH/CRITICAL vulnerabilities that have a fix). Set to false for a byte-for-byte reproducible rebuild.
+ARG APK_UPGRADE=true
+
+LABEL org.opencontainers.image.title="${SERVICE}" \
+      org.opencontainers.image.description="grocery ${SERVICE} (Spring Boot, layered jar)" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.created="${CREATED}" \
+      org.opencontainers.image.source="${SOURCE}" \
+      org.opencontainers.image.url="${SOURCE}" \
+      org.opencontainers.image.vendor="grocery" \
+      org.opencontainers.image.licenses="NOASSERTION" \
+      org.opencontainers.image.base.name="docker.io/library/${JRE_IMAGE}"
+
+RUN if [ "$APK_UPGRADE" = "true" ]; then apk upgrade --no-cache; fi \
+ && addgroup -S -g 10001 app \
+ && adduser -S -D -H -u 10001 -G app -h /app -s /sbin/nologin app
+
+WORKDIR /app
+# Owned by root, read-only for the app user: the process cannot change its own code.
+COPY --from=layers /build/extracted/dependencies/ ./
+COPY --from=layers /build/extracted/spring-boot-loader/ ./
+COPY --from=layers /build/extracted/snapshot-dependencies/ ./
+COPY --from=layers /build/extracted/application/ ./
+
+USER 10001:10001
+EXPOSE ${PORT}
+# JVM sizing (JAVA_TOOL_OPTIONS), the Spring profile and every setting arrive as environment variables (ECS task
+# definition, contract §7); nothing environment-specific is baked into the image.
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]

@@ -1,0 +1,85 @@
+{
+  "settings": {
+    "number_of_shards": "1",
+    "number_of_replicas": "0",
+    "analysis": {
+      "filter": {
+        "english_possessive": { "type": "stemmer", "language": "possessive_english" },
+        "english_light": { "type": "stemmer", "language": "light_english" },
+        "grocery_synonyms": { "type": "synonym_graph", "lenient": true, "synonyms": [] }
+      },
+      "analyzer": {
+        "product_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding", "english_possessive", "english_light"]
+        },
+        "product_search": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding", "english_possessive", "english_light", "grocery_synonyms"]
+        },
+        "autocomplete_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding"]
+        }
+      },
+      "normalizer": {
+        "keyword_normalizer": { "type": "custom", "filter": ["lowercase", "asciifolding"] }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "restaurantId": { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "analyzer": "product_text",
+        "search_analyzer": "product_search",
+        "fields": {
+          "keyword": { "type": "keyword", "normalizer": "keyword_normalizer", "ignore_above": 256 },
+          "sayt": { "type": "search_as_you_type", "analyzer": "autocomplete_text" }
+        }
+      },
+      "description": { "type": "text", "analyzer": "product_text", "search_analyzer": "product_search" },
+      "cuisines": { "type": "keyword" },
+      "cuisinesText": { "type": "text", "analyzer": "product_text", "search_analyzer": "product_search" },
+      "city": { "type": "keyword", "normalizer": "keyword_normalizer" },
+      "locality": { "type": "keyword", "normalizer": "keyword_normalizer" },
+      "location": { "type": "geo_point" },
+      "address": { "type": "object", "enabled": false },
+      "openingHours": {
+        "type": "nested",
+        "properties": {
+          "dayOfWeek": { "type": "keyword" },
+          "opensMinute": { "type": "integer" },
+          "closesMinute": { "type": "integer" }
+        }
+      },
+      "openingHoursDisplay": { "type": "object", "enabled": false },
+      "acceptingOrders": { "type": "boolean" },
+      "pureVeg": { "type": "boolean" },
+      "status": { "type": "keyword" },
+      "visible": { "type": "boolean" },
+      "menuItems": {
+        "type": "nested",
+        "properties": {
+          "itemId": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "product_text", "search_analyzer": "product_search" },
+          "categoryName": { "type": "keyword" },
+          "price": { "type": "scaled_float", "scaling_factor": 100 },
+          "foodType": { "type": "keyword" },
+          "available": { "type": "boolean" }
+        }
+      },
+      "menu": { "type": "object", "enabled": false },
+      "listingVersion": { "type": "long" },
+      "updatedAt": { "type": "date" },
+      "rating": { "type": "scaled_float", "scaling_factor": 100 },
+      "ratingCount": { "type": "integer" },
+      "ratingVersion": { "type": "long" }
+    }
+  }
+}

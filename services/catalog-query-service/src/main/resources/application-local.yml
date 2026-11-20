@@ -1,0 +1,8 @@
+# Run from the IDE while everything else runs in Docker:
+#   docker compose stop catalog-query-service   (in infrastructure/local), then run CatalogQueryServiceApplication
+#   with profile "local". Elasticsearch is published on localhost:9200 (ES_HOST_PORT).
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.grocery: DEBUG

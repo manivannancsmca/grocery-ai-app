@@ -1,0 +1,137 @@
+{
+  "type": "record",
+  "name": "ReturnRequested",
+  "namespace": "com.grocery.events.order",
+  "doc": "A customer asked to return items of a delivered order (status REQUESTED); the store decides. Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {
+      "name": "returnId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the return request."
+    },
+    {
+      "name": "returnNumber",
+      "type": "string",
+      "doc": "Human-readable return number, e.g. RT-7K3M9QX2."
+    },
+    {
+      "name": "orderId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the order (message key)."
+    },
+    {
+      "name": "orderNumber",
+      "type": "string",
+      "doc": "Human-readable order number."
+    },
+    {
+      "name": "orderType",
+      "type": "string",
+      "doc": "Store type of the order. One of: GROCERY, RESTAURANT."
+    },
+    {
+      "name": "customerId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the customer."
+    },
+    {
+      "name": "storeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."
+    },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "ReturnRequestedLine",
+          "doc": "A returned line.",
+          "fields": [
+            {
+              "name": "itemId",
+              "type": {
+                "type": "string",
+                "logicalType": "uuid"
+              },
+              "doc": "productId or menuItemId of the order line."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "doc": "Item name from the order."
+            },
+            {
+              "name": "quantity",
+              "type": "int",
+              "doc": "Quantity returned."
+            },
+            {
+              "name": "refundAmount",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              },
+              "doc": "Refund for this line, after the order's coupon discount, 2 decimals."
+            }
+          ]
+        }
+      },
+      "doc": "The lines to return."
+    },
+    {
+      "name": "refundAmount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Total refund if approved, 2 decimals."
+    },
+    {
+      "name": "reason",
+      "type": "string",
+      "doc": "One of: DAMAGED, WRONG_ITEM, MISSING, QUALITY, OTHER."
+    },
+    {
+      "name": "note",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "The customer's note; null if none."
+    },
+    {
+      "name": "decideBy",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When the request escalates to admins if the store has not decided (UTC)."
+    },
+    {
+      "name": "requestedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When it was requested (UTC)."
+    }
+  ]
+}

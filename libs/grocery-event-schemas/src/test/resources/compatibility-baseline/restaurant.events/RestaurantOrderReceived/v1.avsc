@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "RestaurantOrderReceived",
+  "namespace": "com.grocery.events.restaurant",
+  "doc": "A paid restaurant order reached the restaurant and waits for acceptance until acceptBy; the restaurant's order board shows it. Producer: restaurant-service, topic restaurant.events, key orderId (outbox aggregate type RestaurantOrder).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "restaurantId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the restaurant that received the order."},
+    {"name": "ownerUserId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the restaurant owner (receives the new-order alert)."},
+    {"name": "itemCount", "type": "int", "doc": "Number of units ordered."},
+    {"name": "total", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}, "doc": "Order total paid by the customer, INR."},
+    {"name": "acceptBy", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "Deadline for accepting; after it the order is auto-rejected (UTC)."},
+    {"name": "receivedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the restaurant received the order (UTC)."}
+  ]
+}

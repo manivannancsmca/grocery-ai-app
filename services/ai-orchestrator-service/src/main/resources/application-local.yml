@@ -1,0 +1,9 @@
+# Run from the IDE while everything else runs in Docker:
+#   docker compose stop ai-orchestrator-service   (in infrastructure/local), then run
+#   AiOrchestratorServiceApplication with profile "local" (MySQL on localhost:3307, gateway on localhost:8080,
+#   Ollama on localhost:11434; or AI_PROVIDER=scripted without a model).
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.grocery: DEBUG

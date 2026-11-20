@@ -1,0 +1,72 @@
+# Defaults = running from the IDE against the Dockerised infrastructure (profile "local").
+server:
+  port: 8106
+  shutdown: graceful
+
+spring:
+  application:
+    name: catalog-query-service
+  # MCP pilot (2026-11-20): the product search as an MCP tool for MCP clients acting for a signed-in user (the shopping
+  # assistant first). Stateless Streamable HTTP: every POST stands alone (no session), so any replica answers it, and
+  # the tool runs on the request's thread with the caller's verified token. Not a public path: a token is required.
+  ai:
+    mcp:
+      server:
+        name: catalog-query-service
+        version: 1.0.0
+        protocol: STATELESS
+        type: SYNC
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
+        streamable-http:
+          mcp-endpoint: /api/mcp/catalog
+  threads:
+    virtual:
+      enabled: true
+  # Elasticsearch is the only store. ElasticsearchClient is auto-configured from these settings.
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: 2s
+    socket-timeout: 15s
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+    listener:
+      auto-startup: ${KAFKA_LISTENERS_ENABLED:true}
+  # Zero trust: this service validates every JWT itself (signature via identity JWKS, issuer, audience).
+  # Catalog reads are public, so a token is accepted but not required there.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://localhost:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://identity.grocery.local}
+          audiences: grocery-api
+
+grocery:
+  security:
+    # Never add /internal/** here: service-to-service endpoints always require a valid token (zero trust).
+    public-paths:
+      - /api/search/**
+      - /api/catalog/**
+  catalog:
+    # "Open now" is evaluated against each restaurant's weekly hours in this time zone.
+    timezone: Asia/Kolkata
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+info:
+  service: catalog-query-service
+  phase: 12

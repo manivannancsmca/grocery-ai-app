@@ -1,0 +1,11 @@
+// catalog-query-service: build, test, scan, image and deploy this service on its own (contract Phase 14 §6).
+// Stages, parameters (DRY_RUN, VALIDATE_ONLY) and options: infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryServicePipeline(
+    service: 'catalog-query-service',
+    port: 8106,
+    producesEvents: false,   // publishes no events through the outbox
+    hasContracts: true,      // Pact provider: verifies contracts/pacts/*-catalog-query-service.json
+    testcontainers: true
+)

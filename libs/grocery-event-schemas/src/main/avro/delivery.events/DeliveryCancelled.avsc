@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "DeliveryCancelled",
+  "namespace": "com.grocery.events.delivery",
+  "doc": "The order was cancelled before pickup, so the delivery was cancelled; open offers are withdrawn and the assigned partner (if any) is released. Producer: delivery-service, topic delivery.events, key orderId (outbox aggregate type Delivery).",
+  "fields": [
+    {"name": "deliveryId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery."},
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "partnerId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "The partner who was assigned; null if none."},
+    {"name": "cancelledAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the delivery was cancelled (UTC)."}
+  ]
+}

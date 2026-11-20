@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "OrderStuckDetected",
+  "namespace": "com.grocery.events.order",
+  "doc": "The stuck-order watchdog found an order that has stayed in one status longer than its threshold (first detection only; the flag resolves itself when the order moves on). Producer: order-service, topic order.events, key orderId. Consumer: notification-service (STUCK_ORDER to SUPER_ADMIN, OPS_ADMIN, SUPPORT).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "status", "type": "string", "doc": "The order status it is stuck in, e.g. CREATED, AWAITING_PAYMENT, CONFIRMED, ACCEPTED, PREPARING, READY_FOR_PICKUP, OUT_FOR_DELIVERY."},
+    {"name": "reason", "type": "string", "doc": "One of: STOCK_CHECK_OVERDUE, PAYMENT_EXPIRY_OVERDUE, STORE_RESPONSE_OVERDUE, PREPARATION_OVERDUE, PICKUP_OVERDUE, DELIVERY_OVERDUE."},
+    {"name": "since", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order entered that status (UTC)."},
+    {"name": "detectedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the watchdog flagged it (UTC)."}
+  ]
+}

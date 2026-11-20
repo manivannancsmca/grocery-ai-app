@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "CustomerProfileUpdated",
+  "namespace": "com.grocery.events.customer",
+  "doc": "A customer changed the name or phone number of their profile (PUT /api/customers/me). Producer: customer-service, topic customer.events, key customerId. Published only when one of them changed. Consumers keep their copy of the name up to date (identity: the account and the JWT name claim; notification: email greetings).",
+  "fields": [
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer, which is also the identity user id."},
+    {"name": "fullName", "type": "string", "doc": "The full name now on the profile (trimmed, at most 120 characters)."},
+    {"name": "phone", "type": ["null", "string"], "default": null, "doc": "The phone number now on the profile (10-15 digits, optional leading +); null when the customer has none."},
+    {"name": "updatedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the profile was saved (UTC). Consumers ignore an event older than the last one they applied."}
+  ]
+}

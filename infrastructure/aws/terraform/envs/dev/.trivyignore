@@ -1,0 +1,12 @@
+# Accepted Trivy findings for the dev environment only (validate.sh adds them to ../../../.trivyignore for the dev
+# scan; staging and prod are scanned without them and are clean for these checks).
+
+# AWS-0077 (MEDIUM) RDS backup retention of 1 day: dev data is disposable; 1 day keeps the binlog (Debezium) enabled at
+# the lowest cost. staging 7 days, prod 14 days.
+AWS-0077 exp:2027-11-13
+
+# AWS-0177 (MEDIUM) RDS deletion protection disabled: dev is torn down and recreated freely. On in staging and prod.
+AWS-0177 exp:2027-11-13
+
+# AWS-0133 (LOW) Performance Insights disabled: not offered on the db.t4g.small dev class. On in staging and prod.
+AWS-0133 exp:2027-11-13

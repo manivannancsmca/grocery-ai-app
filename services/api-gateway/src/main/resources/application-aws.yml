@@ -1,0 +1,71 @@
+# =====================================================================================================================
+# Profile "aws" of api-gateway (contract Phase 14 §7): ECS Fargate, task definition grocery-<env>-api-gateway.
+# The task definition (Terraform modules/platform + services.auto.tfvars.json) sets SPRING_PROFILES_ACTIVE=aws, so
+# this file is applied ALONE on top of application.yml (not with the docker profile). It reads ONLY environment
+# variables: plain values from the task definition, secrets from Secrets Manager through the task's `secrets` -
+# no secret and no environment-specific value is written here.
+# Infrastructure endpoints have no default: a missing one stops the service at start-up instead of silently
+# connecting to localhost.
+#
+# Environment:
+#   REDIS_HOST, REDIS_PORT (6379)                 ElastiCache for Redis primary endpoint
+#   REDIS_TLS (true), REDIS_AUTH                  in-transit encryption; AUTH token (secret grocery/<env>/redis/auth-token)
+#   JWT_ISSUER                                    https://<domain> (the issuer identity-service signs)
+#   IDENTITY_JWKS_URI                             identity JWKS through Service Connect
+#   GATEWAY_ALLOWED_ORIGINS                       CORS origin = the app URL
+#   GATEWAY_TRUSTED_PROXIES (2)                   proxies in front of the gateway whose X-Forwarded-For entry is trusted
+#                                                 for the per-IP rate limit: CloudFront + ALB = 2
+#   <UNIT>_SERVICE_URL (17)                       route targets, Service Connect names (http://order-service:8110 ...);
+#                                                 set by Terraform. KAFKA_CONNECT_URL has no AWS counterpart (MSK Connect
+#                                                 has no Connect REST API): the admin connector routes answer 5xx there.
+#   OTEL_EXPORTER_OTLP_ENDPOINT (http://localhost:4318)   the ADOT sidecar of the task (traces -> X-Ray)
+#   TRACING_SAMPLING_PROBABILITY (0.1)            share of traces kept
+#   GROCERY_ENV                                   dev | staging | prod: the env tag of every metric and log line
+#   JAVA_TOOL_OPTIONS, TZ                         JVM sizing (MaxRAMPercentage), UTC
+# Run it locally against the docker stack ("aws-like"): infrastructure/ci/README.md, "application-aws.yml".
+# =====================================================================================================================
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 25s     # graceful shutdown inside the ECS stopTimeout (30 s)
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_AUTH:}
+      ssl:
+        enabled: ${REDIS_TLS:true}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:   # zero trust: every service validates the JWT itself (identity JWKS, issuer, audience)
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://identity-service:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER}
+
+grocery:
+  gateway:
+    allowed-origins: ${GATEWAY_ALLOWED_ORIGINS}   # https://<domain>
+    rate-limit:
+      trusted-proxies: ${GATEWAY_TRUSTED_PROXIES:2}   # CloudFront -> ALB -> gateway
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus   # on the management port 9080 (application.yml): the ADOT sidecar scrapes localhost:9080 (-> AMP)
+  endpoint:
+    health:
+      probes:
+        enabled: true   # /actuator/health/liveness on :9080 (container check); the ALB checks GET /api/health/gateway on :8080 (readiness-aware)
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+
+logging:
+  structured:
+    format:
+      console: ecs   # JSON lines (traceId, spanId, correlationId, service) -> CloudWatch Logs (awslogs)

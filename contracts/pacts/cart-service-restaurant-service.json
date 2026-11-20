@@ -1,0 +1,369 @@
+{
+  "consumer": {
+    "name": "cart-service"
+  },
+  "interactions": [
+    {
+      "description": "a menu quote of a dish on the menu and one that is not",
+      "key": "5f1bc1b3",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "an approved restaurant with a dish on its menu",
+          "params": {
+            "menuItemId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e7a1",
+            "missingMenuItemId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e7a9",
+            "restaurantId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6f1"
+          }
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "itemIds": [
+              "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e7a1",
+              "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e7a9"
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.itemIds[0]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.itemIds[1]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            },
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/internal/restaurants/0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6f1/menu-quote"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "acceptingOrders": true,
+            "city": "Bengaluru",
+            "items": [
+              {
+                "available": true,
+                "foodType": "VEG",
+                "imageUrl": "https://cdn.grocery.local/menu/paneer-tikka.jpg",
+                "itemId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e7a1",
+                "name": "Paneer Tikka",
+                "price": 220.00
+              }
+            ],
+            "latitude": 12.9352,
+            "longitude": 77.6245,
+            "missing": [
+              "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e7a9"
+            ],
+            "name": "Spice Route",
+            "openNow": true,
+            "restaurantId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6f1",
+            "status": "APPROVED"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.acceptingOrders": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.city": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].available": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].foodType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].imageUrl": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].itemId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.items[*].name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.latitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.longitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.missing[0]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.openNow": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.restaurantId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a menu quote of an unknown restaurant",
+      "key": "168d83d6",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "no restaurant exists with the id",
+          "params": {
+            "restaurantId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6f9"
+          }
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "itemIds": [
+              "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e7a1"
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.itemIds[0]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            },
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/internal/restaurants/0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6f9/menu-quote"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "errorCode": "RESTAURANT_NOT_FOUND"
+          },
+          "contentType": "application/problem+json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/problem+json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/problem\\+json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 404
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.7"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "restaurant-service"
+  }
+}

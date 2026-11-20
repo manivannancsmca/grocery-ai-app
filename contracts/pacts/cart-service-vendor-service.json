@@ -1,0 +1,197 @@
+{
+  "consumer": {
+    "name": "cart-service"
+  },
+  "interactions": [
+    {
+      "description": "a request for an approved vendor's store",
+      "key": "6a027779",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "an approved vendor with a store location",
+          "params": {
+            "vendorId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/internal/vendors/0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1/store"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "active": true,
+            "city": "Bengaluru",
+            "latitude": 12.9719,
+            "longitude": 77.6412,
+            "name": "FreshMart Indiranagar",
+            "status": "APPROVED",
+            "vendorId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.city": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.latitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.longitude": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.vendorId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a request for an unknown vendor's store",
+      "key": "8c481a6a",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "no vendor exists with the id",
+          "params": {
+            "vendorId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b9"
+          }
+        }
+      ],
+      "request": {
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            }
+          }
+        },
+        "method": "GET",
+        "path": "/internal/vendors/0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b9/store"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "errorCode": "VENDOR_NOT_FOUND"
+          },
+          "contentType": "application/problem+json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/problem+json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/problem\\+json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 404
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.7"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "vendor-service"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "RestaurantApproved",
+  "namespace": "com.grocery.events.restaurant",
+  "doc": "An admin approved the restaurant (PENDING_APPROVAL -> APPROVED). Producer: restaurant-service, topic restaurant.events, key restaurantId. Shared restaurant lifecycle payload (same fields as every Restaurant* lifecycle event).",
+  "fields": [
+    {"name": "restaurantId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the restaurant (aggregate id and message key)."},
+    {"name": "ownerUserId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the restaurant's owner (role RESTAURANT_OWNER)."},
+    {"name": "name", "type": ["null", "string"], "default": null, "doc": "The restaurant's name; null while the draft profile has none."},
+    {"name": "reason", "type": ["null", "string"], "default": null, "doc": "Admin's reason on RestaurantRejected and RestaurantSuspended; null for the other lifecycle events."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User who caused the change: the owner (RestaurantRegistered, RestaurantSubmitted) or the admin (RestaurantApproved, RestaurantRejected, RestaurantSuspended, RestaurantReinstated); null when not applicable."}
+  ]
+}

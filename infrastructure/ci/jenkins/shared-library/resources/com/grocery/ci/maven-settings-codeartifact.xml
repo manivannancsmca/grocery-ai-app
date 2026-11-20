@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maven settings of the AWS pipelines (contract Phase 14 §1 "Libraries"): grocery-common and grocery-event-schemas
+  come from the CodeArtifact repository grocery-maven (domain grocery), which also proxies Maven Central
+  (upstream maven-central-store). Confluent's repository stays direct (declared in the poms).
+  The pipeline exports, before Maven runs:
+    CODEARTIFACT_REPO_URL     aws codeartifact get-repository-endpoint ... - -format maven - -query repositoryEndpoint
+    CODEARTIFACT_AUTH_TOKEN   aws codeartifact get-authorization-token ... - -query authorizationToken (12 h)
+  No credential is stored in this file.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <servers>
+        <server>
+            <id>codeartifact</id>
+            <username>aws</username>
+            <password>${env.CODEARTIFACT_AUTH_TOKEN}</password>
+        </server>
+    </servers>
+    <mirrors>
+        <mirror>
+            <id>codeartifact</id>
+            <name>Maven Central through CodeArtifact</name>
+            <url>${env.CODEARTIFACT_REPO_URL}</url>
+            <mirrorOf>central</mirrorOf>
+        </mirror>
+    </mirrors>
+    <profiles>
+        <profile>
+            <id>codeartifact</id>
+            <repositories>
+                <repository>
+                    <id>codeartifact</id>
+                    <url>${env.CODEARTIFACT_REPO_URL}</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
+    <activeProfiles>
+        <activeProfile>codeartifact</activeProfile>
+    </activeProfiles>
+</settings>

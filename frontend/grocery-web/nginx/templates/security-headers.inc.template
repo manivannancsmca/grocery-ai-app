@@ -1,0 +1,19 @@
+# Security headers for every SPA response (included by each static location of default.conf, because an add_header
+# inside a location replaces the server-level ones). Rendered to /etc/nginx/conf.d/security-headers.inc; the *.inc
+# name keeps it out of the "conf.d/*.conf" include. The same values are set by the CloudFront response headers
+# policy on AWS (infrastructure/aws/terraform/modules/spa-hosting); keep the two in sync.
+#
+# CONTENT_SECURITY_POLICY defaults to the policy in Dockerfile.prod (see the comment there for why each source is
+# needed: Razorpay Checkout, OpenStreetMap tiles, vendor product images on any https host, SSE over fetch to /api).
+add_header Content-Security-Policy "${CONTENT_SECURITY_POLICY}" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+# Origin-only referrer: OpenStreetMap's tile usage policy requires a Referer; no path or query leaves the site.
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+# Geolocation for "use my current location" and the delivery partner's position; payment delegated to Razorpay's
+# iframe (Payment Request API for wallets/UPI); everything else off.
+add_header Permissions-Policy 'camera=(), microphone=(), usb=(), geolocation=(self), payment=(self "https://api.razorpay.com" "https://checkout.razorpay.com")' always;
+# Razorpay may open a popup (3-D Secure, net banking) that must keep its opener.
+add_header Cross-Origin-Opener-Policy "same-origin-allow-popups" always;
+add_header Cross-Origin-Resource-Policy "same-origin" always;
+add_header Strict-Transport-Security $grocery_hsts always;

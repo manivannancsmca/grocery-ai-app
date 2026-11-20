@@ -1,0 +1,86 @@
+# Defaults = running from the IDE against the Dockerised infrastructure (profile "local").
+# Inside Docker Compose the "docker" profile overrides hosts (see application-docker.yml).
+server:
+  port: 8101
+  shutdown: graceful
+
+spring:
+  application:
+    name: identity-service
+  threads:
+    virtual:
+      enabled: true          # simple blocking code, high concurrency
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/identity_db?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC
+    username: ${DB_USERNAME:identity_user}
+    password: ${DB_PASSWORD:identity_pass}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate     # schema is owned by Flyway, never by Hibernate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+    listener:
+      auto-startup: ${KAFKA_LISTENERS_ENABLED:true}
+
+grocery:
+  identity:
+    issuer: ${JWT_ISSUER:https://identity.grocery.local}
+    audience: grocery-api
+    access-token-ttl: ${ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: 14d
+    refresh-reuse-grace: 10s
+    refresh-cookie:
+      secure: ${REFRESH_COOKIE_SECURE:true}   # browsers accept Secure cookies on http://localhost
+    bootstrap-admin:
+      email: ${BOOTSTRAP_ADMIN_EMAIL:}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    dev-accounts:
+      # Development only: one well-known account per stakeholder (DevAccountSeeder). Off by default;
+      # the local Docker Compose file and the "local" profile switch it on. Never active with profile "aws".
+      enabled: ${DEV_SEED_ENABLED:false}
+    password-reset:
+      ttl: ${PASSWORD_RESET_TTL:30m}          # how long an emailed reset link works (once)
+      max-requests-per-hour: 3                # links per account per hour; more requests are answered alike and do nothing
+      min-response-time: 250ms                # every forgot request takes at least this long (no timing enumeration)
+  security:
+    public-paths:
+      - /api/auth/register
+      - /api/auth/login
+      - /api/auth/refresh
+      - /api/auth/logout
+      - /api/auth/password/forgot
+      - /api/auth/password/reset
+      - /.well-known/jwks.json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true        # /actuator/health/liveness and /readiness
+  info:
+    env:
+      enabled: true
+
+info:
+  service: identity-service
+  phase: 2

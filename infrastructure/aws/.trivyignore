@@ -1,0 +1,11 @@
+# Accepted Trivy misconfiguration findings for infrastructure/aws/terraform, every environment.
+# validate.sh passes this file to `trivy config` (plus terraform/envs/<env>/.trivyignore for that environment only).
+# Format: one check ID per line, the reason in the comment above it, exp: = date by which the acceptance is reviewed.
+
+# AWS-0104 (CRITICAL) "security group rule allows unrestricted egress" - modules/ecs-cluster, rule tasks_internet,
+# TCP 443 and 587 only (everything else is limited to the VPC CIDR). The services must reach internet endpoints through
+# the NAT gateways: the Razorpay API (payment-service), Amazon SES SMTP (notification-service), public registries for
+# the third-party images (Schema Registry, ADOT, kafka-init/db-init) and the future model endpoint (ai-orchestrator).
+# Their addresses are not stable CIDRs, so a tighter rule needs an egress proxy or AWS Network Firewall with domain
+# allow-lists - not provisioned in this phase (see README "Hardening backlog").
+AWS-0104 exp:2027-11-13

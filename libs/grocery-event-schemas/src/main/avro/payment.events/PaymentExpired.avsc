@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "PaymentExpired",
+  "namespace": "com.grocery.events.payment",
+  "doc": "The payment window ended unpaid and the provider confirmed nothing was captured. Producer: payment-service, topic payment.events, key orderId. Consumer: order-service (cancels the order with PAYMENT_TIMEOUT).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "paymentId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the expired payment."}
+  ]
+}

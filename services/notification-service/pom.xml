@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.2</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.grocery</groupId>
+    <artifactId>notification-service</artifactId>
+    <version>0.12.0-SNAPSHOT</version>
+    <name>notification-service</name>
+    <description>Real-time updates (Phase 7; Phase 9 adds delivery notifications and the live partner location; Phase 11 the assistants' approval notifications; Phase 12 reviews, returns and the email channel): consumes the domain events, resolves recipients from its own projections, keeps the notification inbox and streams notifications and refetch signals to every connected client over Server-Sent Events, fanned out across replicas with Redis pub/sub, and emails the important ones through a transactional email outbox</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <grocery-common.version>0.10.1</grocery-common.version>
+        <grocery-event-schemas.version>1.7.0</grocery-event-schemas.version>
+    </properties>
+
+    <!-- grocery-common's Avro deserializer and Schema Registry client come from Confluent's repository (ADR-0011);
+         Maven Central stays the default for everything else. -->
+    <repositories>
+        <repository>
+            <id>confluent</id>
+            <url>https://packages.confluent.io/maven/</url>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- security-pins: fixed versions of jars that kafka-clients and the Confluent serializer bring in (Trivy
+                 HIGH, fix available; tests/security). Drop each pin once the parent library ships the fix. -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.7.2-jre</version>
+            </dependency>
+            <dependency>
+                <groupId>at.yawk.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>1.11.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.xerial.snappy</groupId>
+                <artifactId>snappy-java</artifactId>
+                <version>1.1.10.9</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.grocery</groupId>
+            <artifactId>grocery-common</artifactId>
+            <version>${grocery-common.version}</version>
+        </dependency>
+
+        <!-- The inbox API and the SSE stream (SseEmitter on virtual threads) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+        </dependency>
+        <!-- The inbox and the projections: plain JDBC (audience joins, INSERT IGNORE, upserts) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Fan-out to every replica: Redis pub/sub (channel grocery:realtime) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!-- Consumer only (group notification-service.dispatch): this service publishes nothing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
+        <!-- Phase 12: the email channel (SMTP; Mailpit locally, a real provider through SPRING_MAIL_* elsewhere) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Event consumer contract tests (Phase 13 §4): samples generated from the schemas, shared helper -->
+        <dependency>
+            <groupId>com.grocery</groupId>
+            <artifactId>grocery-event-schemas</artifactId>
+            <version>${grocery-event-schemas.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-mysql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Test only: the real schemas (Phase 9 DeliveryLocationUpdated, Phase 11 ai.events, Phase 12 review.events and
+             the return events), to encode events exactly as
+             their producers do (this service publishes nothing, so it needs no schemas at
+             runtime) -->
+        <dependency>
+            <groupId>com.grocery</groupId>
+            <artifactId>grocery-event-schemas</artifactId>
+            <version>${grocery-event-schemas.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

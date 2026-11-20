@@ -1,0 +1,383 @@
+# =====================================================================================================================
+# Continuous integration for the FreshCart monorepo (GitHub Actions). Continuous DELIVERY is Argo CD's job: this
+# workflow never holds Kubernetes credentials and never deploys. Its last step only commits new image references to
+# the GitOps repository (manivannancsmca/grocery-gitops); Argo CD sees the commit and syncs the clusters.
+#
+#   pull request -> changes -> libs -> services (Maven verify: unit + Testcontainers integration tests)
+#                                   -> frontend (lint, unit tests, build)
+#                                   -> security (secrets, dependencies, IaC/Dockerfile config, Dockerfile lint)
+#   push to main -> all of the above, then
+#                   images (build once from the tested jar, push to GHCR, Trivy image gate, SBOM + provenance
+#                           attestations) -> gitops (image tag + digest into the kind and staging overlays)
+#
+# Images: ghcr.io/<owner>/grocery-<name>:sha-<full commit sha>, referenced by digest. Tags are never reused.
+# Required secret: GITOPS_DEPLOY_KEY = private half of a deploy key with WRITE access to the GitOps repository only.
+# =====================================================================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md", "docs/**", ".claude/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_all:
+        description: Build, test and publish every service, the frontend and the setup bundle
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  # Superseded pull request runs are cancelled; runs on main always finish (each one may deploy).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  JAVA_VERSION: "25"
+  NODE_VERSION: "24"
+  MAVEN_ARGS: -B -ntp -Dstyle.color=never
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/grocery-
+  TRIVY_IMAGE: aquasec/trivy:0.76.2
+  PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  # -------------------------------------------------------------------------------------------- what changed
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      services: ${{ steps.detect.outputs.services }}
+      images: ${{ steps.detect.outputs.images }}
+      any_service: ${{ steps.detect.outputs.any_service }}
+      frontend: ${{ steps.detect.outputs.frontend }}
+      platform_init: ${{ steps.detect.outputs.platform_init }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: detect
+        run: bash .github/scripts/detect-changes.sh
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          BUILD_ALL: ${{ github.event_name == 'workflow_dispatch' && inputs.build_all }}
+
+  # ---------------------------------------------------------------------------------------- shared libraries
+  libs:
+    name: Shared libraries
+    needs: changes
+    if: needs.changes.outputs.any_service == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      common_version: ${{ steps.versions.outputs.common }}
+      schemas_version: ${{ steps.versions.outputs.schemas }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+          cache-dependency-path: libs/*/pom.xml
+      - name: Build and test grocery-event-schemas and grocery-common
+        run: |
+          mvn $MAVEN_ARGS -f libs/grocery-event-schemas/pom.xml install
+          mvn $MAVEN_ARGS -f libs/grocery-common/pom.xml install
+      - id: versions
+        name: Library versions
+        run: |
+          echo "schemas=$(mvn $MAVEN_ARGS -q -f libs/grocery-event-schemas/pom.xml help:evaluate -Dexpression=project.version -DforceStdout)" >> "$GITHUB_OUTPUT"
+          echo "common=$(mvn $MAVEN_ARGS -q -f libs/grocery-common/pom.xml help:evaluate -Dexpression=project.version -DforceStdout)" >> "$GITHUB_OUTPUT"
+      - name: Package the installed libraries
+        run: tar -C ~/.m2/repository -czf grocery-libs.tgz com/grocery
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: grocery-libs
+          path: grocery-libs.tgz
+          retention-days: 3
+
+  # ------------------------------------------------------------------------------------------------- services
+  service:
+    name: ${{ matrix.service.name }}
+    needs: [changes, libs]
+    if: needs.changes.outputs.any_service == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+          cache-dependency-path: services/${{ matrix.service.name }}/pom.xml
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: grocery-libs
+      - name: Install the shared libraries into the local Maven repository
+        run: mkdir -p ~/.m2/repository && tar -C ~/.m2/repository -xzf grocery-libs.tgz
+      # Unit tests (surefire) and Testcontainers integration tests (MySQL, Kafka, Redis, ... in Docker on the runner).
+      # The monorepo builds every service against the libraries of the same commit.
+      - name: Maven verify (unit + integration tests)
+        run: >
+          mvn $MAVEN_ARGS -f services/${{ matrix.service.name }}/pom.xml verify
+          -Dgrocery-common.version=${{ needs.libs.outputs.common_version }}
+          -Dgrocery-event-schemas.version=${{ needs.libs.outputs.schemas_version }}
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reports-${{ matrix.service.name }}
+          path: |
+            services/${{ matrix.service.name }}/target/surefire-reports/
+            services/${{ matrix.service.name }}/target/failsafe-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Keep the tested jar for the image build
+        if: env.PUBLISH == 'true'
+        run: |
+          jar="$(ls services/${{ matrix.service.name }}/target/*.jar | grep -vE -- '-(plain|sources|javadoc)\.jar$' | head -1)"
+          mkdir -p .ci/image && cp "$jar" .ci/image/app.jar && ls -l .ci/image
+      - if: env.PUBLISH == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jar-${{ matrix.service.name }}
+          path: .ci/image/app.jar
+          retention-days: 3
+
+  # ------------------------------------------------------------------------------------------------- frontend
+  frontend:
+    name: grocery-web-ui
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend/grocery-web-ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/grocery-web-ui/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test -- --run
+        env:
+          VITEST_MAX_WORKERS: "2"
+      - name: Build
+        run: npm run build
+
+  # ------------------------------------------------------------------------------------------------- security
+  security:
+    name: Security and quality checks
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write   # upload SARIF to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Secrets in the git history (gitleaks)
+        # (the container runs as another user, so git inside it must be told the checkout is safe)
+        run: >
+          docker run --rm -v "$PWD:/repo"
+          -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*'
+          ghcr.io/gitleaks/gitleaks:v8.30.1
+          git /repo --redact --no-banner --exit-code 1
+      - name: Dockerfile lint (hadolint)
+        run: |
+          for file in infrastructure/ci/docker/Dockerfile.service frontend/grocery-web-ui/Dockerfile.prod \
+                      infrastructure/k8s/platform-init/Dockerfile; do
+            echo "== $file"
+            docker run --rm -i hadolint/hadolint:v2.15.1 hadolint --failure-threshold error - < "$file"
+          done
+      # Dependencies of the frontend (package-lock.json), secrets and IaC / Dockerfile misconfigurations. The Java
+      # dependencies are scanned inside the built images (the image gate below), where the exact jars are known.
+      - name: Trivy filesystem scan (SARIF for code scanning)
+        run: >
+          docker run --rm -v "$PWD:/src" -w /src $TRIVY_IMAGE fs
+          --scanners vuln,secret,misconfig --skip-files '**/pom.xml' --skip-dirs '**/node_modules'
+          --severity HIGH,CRITICAL --ignore-unfixed --ignorefile infrastructure/ci/docker/.trivyignore
+          --format sarif --output trivy-fs.sarif --exit-code 0 /src
+      - uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        if: always() && hashFiles('trivy-fs.sarif') != ''
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+      - name: Trivy gate (fails on fixable HIGH / CRITICAL dependency vulnerabilities and on secrets)
+        run: >
+          docker run --rm -v "$PWD:/src" -w /src $TRIVY_IMAGE fs
+          --scanners vuln,secret --skip-files '**/pom.xml' --skip-dirs '**/node_modules'
+          --severity HIGH,CRITICAL --ignore-unfixed --ignorefile infrastructure/ci/docker/.trivyignore
+          --exit-code 1 /src
+
+  # --------------------------------------------------------------------------------------------------- images
+  images:
+    name: Image ${{ matrix.image.name }}
+    needs: [changes, service, frontend, security]
+    # Only on main, only when everything before passed (skipped jobs are fine: nothing of theirs changed).
+    if: >
+      always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+      && needs.changes.outputs.images != '[]'
+      && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write        # push to ghcr.io
+      id-token: write        # keyless signing of the attestations (Sigstore)
+      attestations: write    # build provenance + SBOM attestations
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    env:
+      # ghcr.io/<owner>/grocery-<service>, ghcr.io/<owner>/grocery-web-ui, ghcr.io/<owner>/grocery-platform-init
+      REPOSITORY: ghcr.io/${{ github.repository_owner }}/${{ startsWith(matrix.image.name, 'grocery-') && matrix.image.name || format('grocery-{0}', matrix.image.name) }}
+      TAG: sha-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Image build settings
+        id: cfg
+        run: |
+          case "${{ matrix.image.kind }}" in
+            service)
+              echo "context=.ci/image" >> "$GITHUB_OUTPUT"
+              echo "file=infrastructure/ci/docker/Dockerfile.service" >> "$GITHUB_OUTPUT" ;;
+            frontend)
+              echo "context=frontend/grocery-web-ui" >> "$GITHUB_OUTPUT"
+              echo "file=frontend/grocery-web-ui/Dockerfile.prod" >> "$GITHUB_OUTPUT" ;;
+            platform-init)
+              bash infrastructure/k8s/platform-init/stage.sh .ci/platform-init
+              echo "context=.ci/platform-init" >> "$GITHUB_OUTPUT"
+              echo "file=infrastructure/k8s/platform-init/Dockerfile" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Tested jar from the service job
+        if: matrix.image.kind == 'service'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: jar-${{ matrix.image.name }}
+          path: .ci/image
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ steps.cfg.outputs.context }}
+          file: ${{ steps.cfg.outputs.file }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.REPOSITORY }}:${{ env.TAG }}
+          build-args: |
+            SERVICE=${{ matrix.image.name }}
+            PORT=${{ matrix.image.port }}
+            VERSION=${{ env.TAG }}
+            REVISION=${{ github.sha }}
+            CREATED=${{ steps.cfg.outputs.created }}
+            SOURCE=${{ github.server_url }}/${{ github.repository }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,scope=${{ matrix.image.name }},mode=max
+          provenance: mode=max
+          sbom: true
+      # The gate runs on the pushed digest. A failing image is in the registry but never reaches the GitOps
+      # repository (the gitops job needs this job), so it is never deployed.
+      - name: Trivy image gate (fixable HIGH / CRITICAL)
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          docker run --rm -v "$PWD/infrastructure/ci/docker/.trivyignore:/trivyignore:ro"
+          -e TRIVY_USERNAME -e TRIVY_PASSWORD
+          $TRIVY_IMAGE image --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /trivyignore
+          --exit-code 1 --no-progress "${REPOSITORY}@${{ steps.build.outputs.digest }}"
+      - name: Build provenance attestation
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REPOSITORY }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Deploy record for the GitOps update
+        run: |
+          mkdir -p deploy-records
+          echo "${{ matrix.image.name }} ${{ matrix.image.kind }} ${REPOSITORY} ${TAG} ${{ steps.build.outputs.digest }}" \
+            > "deploy-records/${{ matrix.image.name }}.txt"
+          cat "deploy-records/${{ matrix.image.name }}.txt"
+          echo "### ${{ matrix.image.name }}: \`${REPOSITORY}:${TAG}@${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deploy-record-${{ matrix.image.name }}
+          path: deploy-records/${{ matrix.image.name }}.txt
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------- GitOps update
+  gitops:
+    name: Update the GitOps repository
+    needs: [changes, images]
+    if: always() && needs.images.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # One update at a time across all runs, oldest first, never cancelled.
+    concurrency:
+      group: gitops-update
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: deploy-record-*
+          path: deploy-records
+          merge-multiple: true
+      - name: Check out the GitOps repository (write deploy key, this repository only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/grocery-gitops
+          ref: main
+          path: gitops
+          ssh-key: ${{ secrets.GITOPS_DEPLOY_KEY }}
+          persist-credentials: true
+      - name: Commit the new image references (kind + staging)
+        run: bash .github/scripts/update-gitops.sh gitops deploy-records
+        env:
+          ENVIRONMENTS: kind staging

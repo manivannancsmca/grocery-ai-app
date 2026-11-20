@@ -1,0 +1,23 @@
+{
+  "type": "record",
+  "name": "PaymentCaptured",
+  "namespace": "com.grocery.events.test",
+  "doc": "Test schema (grocery-common tests only).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "paymentId", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "amount", "type": {"type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2}},
+    {"name": "currency", "type": "string", "default": "INR"},
+    {"name": "method", "type": ["null", "string"], "default": null},
+    {"name": "capturedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}},
+    {"name": "late", "type": "boolean"},
+    {"name": "items", "type": {"type": "array", "items": {
+      "type": "record", "name": "Item", "fields": [
+        {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}},
+        {"name": "quantity", "type": "int"},
+        {"name": "unitPrice", "type": {"type": "bytes", "logicalType": "decimal", "precision": 10, "scale": 2}}
+      ]}}},
+    {"name": "deliveryDate", "type": ["null", {"type": "int", "logicalType": "date"}], "default": null},
+    {"name": "attributes", "type": ["null", {"type": "string", "logicalType": "json"}], "default": null}
+  ]
+}

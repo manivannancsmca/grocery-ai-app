@@ -1,0 +1,81 @@
+# Defaults = running from the IDE against the Dockerised infrastructure (profile "local").
+server:
+  port: 8103
+  shutdown: graceful
+
+spring:
+  application:
+    name: vendor-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/vendor_db?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC
+    username: ${DB_USERNAME:vendor_user}
+    password: ${DB_PASSWORD:vendor_pass}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.default_batch_fetch_size: 100   # lines and timelines of a board page in a few queries
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+    listener:
+      auto-startup: ${KAFKA_LISTENERS_ENABLED:true}
+  # Zero trust: this service validates every JWT itself (signature via identity JWKS, issuer, audience).
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://localhost:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://identity.grocery.local}
+          audiences: grocery-api
+
+grocery:
+  # Admin platform settings (docs/api/platform-settings.md): fulfillment.acceptance-timeout below is the default of the
+  # grocery-stores area; an admin's saved value overrides it. Each instance re-reads the overrides at most this often.
+  settings:
+    cache-ttl: ${PLATFORM_SETTINGS_CACHE_TTL:15s}
+  security:
+    # The public store directory (docs/api/phase-3-catalog-and-search.md §9): a token is accepted but not required.
+    # Never add /internal/** here: service-to-service endpoints always require a valid token (zero trust).
+    public-paths:
+      - /api/stores/**
+  stores:
+    # Must match cart-service grocery.cart.delivery (road-factor, grocery.max-distance-km): the stores listed as
+    # delivering to a point are exactly the ones checkout accepts.
+    road-factor: 1.3
+    delivery-limit-km: 15
+    max-results: 50
+  approvals:
+    enabled: true          # Phase 11: verify X-Approval-Token on AI-approved calls (JWKS from APPROVAL_JWKS_URI)
+  # Phase 8: the vendor order board (docs/api/phase-8-vendor-and-restaurant-fulfillment.md §2, §3)
+  fulfillment:
+    acceptance-timeout: ${ACCEPTANCE_TIMEOUT:5m}          # acceptBy = received + this; then auto-rejected (NO_RESPONSE)
+    poll-interval: ${ACCEPTANCE_POLL_INTERVAL:15s}        # pause between auto-reject poller runs
+    poll-batch-size: 20                                   # orders claimed per transaction (SKIP LOCKED)
+    auto-reject-enabled: ${ACCEPTANCE_AUTO_REJECT_ENABLED:true}  # the poller in this instance (safe in every replica)
+    default-ready-in-minutes: 15                          # accept without readyInMinutes
+    timezone: Asia/Kolkata                                # the days of the sales report
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+info:
+  service: vendor-service
+  phase: 12

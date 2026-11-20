@@ -1,0 +1,16 @@
+# Every *.json in observability/grafana/dashboards is loaded into the "Grocery" folder (re-read every 30 s).
+# Dashboards are read-only in Grafana: change the JSON file (export from the UI → save over the file).
+apiVersion: 1
+
+providers:
+  - name: grocery
+    orgId: 1
+    folder: Grocery
+    folderUid: grocery
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

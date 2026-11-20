@@ -1,0 +1,58 @@
+{
+  "settings": {
+    "number_of_shards": "1",
+    "number_of_replicas": "0",
+    "analysis": {
+      "filter": {
+        "english_possessive": { "type": "stemmer", "language": "possessive_english" },
+        "english_light": { "type": "stemmer", "language": "light_english" },
+        "grocery_synonyms": { "type": "synonym_graph", "lenient": true, "synonyms": [] }
+      },
+      "analyzer": {
+        "product_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding", "english_possessive", "english_light"]
+        },
+        "product_search": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding", "english_possessive", "english_light", "grocery_synonyms"]
+        },
+        "autocomplete_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding"]
+        }
+      },
+      "normalizer": {
+        "keyword_normalizer": { "type": "custom", "filter": ["lowercase", "asciifolding"] }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "categoryId": { "type": "keyword" },
+      "parentId": { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "analyzer": "product_text",
+        "search_analyzer": "product_search",
+        "fields": {
+          "keyword": { "type": "keyword", "normalizer": "keyword_normalizer", "ignore_above": 256 },
+          "sayt": { "type": "search_as_you_type", "analyzer": "autocomplete_text" }
+        }
+      },
+      "description": { "type": "text", "analyzer": "product_text", "search_analyzer": "product_search" },
+      "imageUrl": { "type": "keyword", "index": false, "doc_values": false },
+      "sortOrder": { "type": "integer" },
+      "depth": { "type": "integer" },
+      "path": { "type": "object", "enabled": false },
+      "pathNames": { "type": "keyword" },
+      "active": { "type": "boolean" },
+      "effectiveActive": { "type": "boolean" },
+      "categoryVersion": { "type": "long" }
+    }
+  }
+}

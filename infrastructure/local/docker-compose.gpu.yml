@@ -1,0 +1,12 @@
+# Optional override: give Ollama an NVIDIA GPU (Docker Desktop + WSL2 + NVIDIA driver required).
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile ai up -d
+# Without an NVIDIA GPU, do not use this file — Ollama runs on CPU (slower, use a small model).
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "StockReservationFailed",
+  "namespace": "com.grocery.events.inventory",
+  "doc": "Nothing was held for a grocery order: at least one product lacks stock (unknown or archived products count as 0 available). Producer: inventory-service, topic inventory.events (aggregate Reservation), key orderId. Consumer: order-service.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "unavailableItems", "type": {"type": "array", "items": {
+      "type": "record",
+      "name": "StockReservationFailedUnavailableItem",
+      "doc": "A product that could not be reserved.",
+      "fields": [
+        {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product."},
+        {"name": "requested", "type": "int", "doc": "Quantity the order asked for."},
+        {"name": "available", "type": "int", "doc": "Quantity available at the time."}
+      ]
+    }}, "doc": "The products that lack stock."}
+  ]
+}

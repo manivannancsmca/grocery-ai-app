@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "RestaurantOrderAccepted",
+  "namespace": "com.grocery.events.restaurant",
+  "doc": "The restaurant accepted the order. Producer: restaurant-service, topic restaurant.events, key orderId (outbox aggregate type RestaurantOrder).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "restaurantId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the restaurant that received the order."},
+    {"name": "readyInMinutes", "type": "int", "doc": "The restaurant's estimate of minutes until the order is ready for pickup."},
+    {"name": "readyBy", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "acceptedAt plus readyInMinutes (UTC)."},
+    {"name": "acceptedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order was accepted (UTC)."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User id of the restaurant user who accepted."}
+  ]
+}

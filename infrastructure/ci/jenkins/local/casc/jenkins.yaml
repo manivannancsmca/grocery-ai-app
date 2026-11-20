@@ -1,0 +1,79 @@
+# =====================================================================================================================
+# Configuration as code of the local validation Jenkins (infrastructure/ci/jenkins/local). Read at every start from
+# the mounted repository (CASC_JENKINS_CONFIG). ${VAR} values come from the container environment (docker-compose.yml).
+# =====================================================================================================================
+jenkins:
+  systemMessage: >-
+    grocery local CI - validation only: AWS calls are always DRY_RUN (GROCERY_FORCE_DRY_RUN), images go to the
+    local registry standing in for ECR, jobs read the mounted workspace (/repo). See infrastructure/ci/README.md.
+  # Steps run in sibling containers through the Docker socket; the controller itself is the "docker" agent.
+  numExecutors: 3
+  labelString: "docker"
+  mode: NORMAL
+  slaveAgentPort: -1
+  markupFormatter: plainText
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID:-admin}"
+          name: "Local CI admin"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: GROCERY_LOCAL_CI
+            value: "true"
+          - key: GROCERY_FORCE_DRY_RUN
+            value: "true"
+          - key: GROCERY_LOCAL_REPO
+            value: "/repo"
+          # the Docker daemon pushes to its own localhost (published registry port); Jenkins reads the API by name
+          - key: GROCERY_CI_REGISTRY
+            value: "localhost:${CI_REGISTRY_PORT:-5000}"
+          - key: GROCERY_CI_REGISTRY_API
+            value: "registry:5000"
+          - key: GROCERY_CI_VOLUMES_FROM
+            value: "grocery-ci-jenkins"
+          - key: GROCERY_DOCKER_GID
+            value: "${DOCKER_GID:-0}"
+          - key: GROCERY_CI_M2_VOLUME
+            value: "grocery-ci-m2"
+          - key: GROCERY_CI_NPM_VOLUME
+            value: "grocery-ci-npm"
+          - key: GROCERY_CI_TRIVY_VOLUME
+            value: "grocery-ci-trivy-cache"
+          # DRY_RUN placeholders of the target account (the region of infrastructure/aws/terraform/envs/*)
+          - key: AWS_REGION
+            value: "ap-south-1"
+          - key: AWS_ACCOUNT_ID
+            value: "000000000000"
+
+security:
+  globalJobDslSecurityConfiguration:
+    # jobs.groovy reads the mounted repository (java.io.File) to find every Jenkinsfile; admin-provided, local only
+    useScriptSecurity: false
+
+unclassified:
+  location:
+    url: "http://localhost:${JENKINS_PORT:-8190}/"
+    adminAddress: "Local CI <ci@grocery.local>"
+  globalLibraries:
+    libraries:
+      - name: "grocery"
+        defaultVersion: "main"
+        implicit: false
+        allowVersionOverride: false
+        includeInChangesets: false
+        retriever:
+          modernSCM:
+            scm:
+              git:
+                # filled from /repo/infrastructure/ci/jenkins/shared-library by sync-shared-library.sh
+                remote: "/var/jenkins_home/local-scm/grocery-shared-library"
+
+jobs:
+  - file: /repo/infrastructure/ci/jenkins/local/jobs/jobs.groovy

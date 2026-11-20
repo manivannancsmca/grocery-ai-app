@@ -1,0 +1,85 @@
+# =====================================================================================
+# Loki — single binary, filesystem storage, 3 days retention (Phase 13 §2).
+# Streams are labelled only by "service" and "level" (Alloy); traceId, spanId, correlationId and container are
+# structured metadata:  {service="order-service"} | traceId="4bf92f3577b34da6a3ce929d0e0e4736"
+# =====================================================================================
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  replication_factor: 1
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: "2026-01-01"
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  retention_period: 72h
+  max_query_lookback: 72h
+  reject_old_samples: true
+  reject_old_samples_max_age: 72h
+  allow_structured_metadata: true
+  volume_enabled: true
+  # Labels stay exactly service + level: no automatic service_name label, no detected_level metadata.
+  discover_service_name: []
+  discover_log_levels: false
+  ingestion_rate_mb: 8
+  ingestion_burst_size_mb: 16
+  max_global_streams_per_user: 2000
+  query_timeout: 1m
+  # No automatic __stream_shard__ label on busy streams (one laptop, labels stay service + level).
+  shard_streams:
+    enabled: false
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 1h
+  delete_request_store: filesystem
+
+ingester:
+  chunk_idle_period: 15m
+  max_chunk_age: 1h
+  chunk_target_size: 1048576
+
+# Small in-process caches (the whole observability profile must stay within 1.5 GB).
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 16
+chunk_store_config:
+  chunk_cache_config:
+    embedded_cache:
+      enabled: true
+      max_size_mb: 32
+
+pattern_ingester:
+  enabled: false
+
+ruler:
+  enable_api: false
+
+analytics:
+  reporting_enabled: false

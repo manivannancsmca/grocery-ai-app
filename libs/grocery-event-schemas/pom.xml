@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  grocery-event-schemas: the central Avro schema of every event published through the transactional outbox
+  (ADR-0011). A versioned, RESOURCE-ONLY jar: src/main/avro/<topic>/<EventType>.avsc is packaged as
+  avro/<topic>/<EventType>.avsc. No generated classes (consumers keep their own tolerant DTOs, ADR-0007).
+  NOT a Maven parent and NOT a multi-module build: producers depend on a pinned version.
+
+  The Spring Boot parent is used for dependency/plugin management only (same as grocery-common).
+  The tests validate every schema and gate BACKWARD_TRANSITIVE compatibility against
+  src/test/resources/compatibility-baseline with Confluent's own checker.
+
+  Build & install into the local Maven repository:  mvn install
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.2</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.grocery</groupId>
+    <artifactId>grocery-event-schemas</artifactId>
+    <version>1.8.0</version>
+    <packaging>jar</packaging>
+    <name>grocery-event-schemas</name>
+    <description>Central Avro schemas of the grocery platform's domain events (resource-only)</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <confluent.version>8.2.4</confluent.version>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>confluent</id>
+            <url>https://packages.confluent.io/maven/</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- security-pins: fixed versions of jars that kafka-clients and the Confluent serializer bring in (Trivy
+                 HIGH, fix available; tests/security). Drop each pin once the parent library ships the fix. -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.7.2-jre</version>
+            </dependency>
+            <dependency>
+                <groupId>at.yawk.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>1.11.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.xerial.snappy</groupId>
+                <artifactId>snappy-java</artifactId>
+                <version>1.1.10.9</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!--
+          Test only: Confluent's AvroSchema and CompatibilityChecker, the same code the Schema Registry runs to
+          decide BACKWARD_TRANSITIVE compatibility. The jar itself has NO runtime dependencies.
+          AvroSchema needs a kafka-clients class (SerializationException) at runtime. Confluent asks for its own
+          kafka-clients 8.2.4-ccs build; Spring Boot's dependency management replaces it with the kafka-clients
+          version the services use (4.2.2), so no second kafka-clients version enters any classpath.
+        -->
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-schema-registry-client</artifactId>
+            <version>${confluent.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Test only (Phase 13, event consumer contract tests): Confluent's KafkaAvroSerializer writes the samples in the
+          wire format, exactly as grocery-common's encoder does. spring-kafka is only needed by this module's own test of
+          the listener discovery (a fixture with a real @KafkaListener); the shared helper reads the annotation by name.
+        -->
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-avro-serializer</artifactId>
+            <version>${confluent.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              Phase 13: the event consumer contract helper (package com.grocery.events.contract: the catalog of the
+              packaged schemas, the sample generator, the Confluent-wire-format record factory and the listener contract
+              runner) is attached as a test-jar of the SAME version, so every consumer service uses one copy:
+                <dependency><groupId>com.grocery</groupId><artifactId>grocery-event-schemas</artifactId>
+                  <version>1.7.0</version><type>test-jar</type><scope>test</scope></dependency>
+              The main jar is unchanged (still resource-only). The helper's own tests and fixtures are not shipped.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>contract-test-jar</id>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>com/grocery/events/contract/**</include>
+                            </includes>
+                            <excludes>
+                                <exclude>**/*Test.class</exclude>
+                                <exclude>**/*Test$*.class</exclude>
+                                <exclude>com/grocery/events/contract/fixture/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+        <!-- The .avsc files are the only content of the jar, at avro/<topic>/<EventType>.avsc. -->
+        <resources>
+            <resource>
+                <directory>src/main/avro</directory>
+                <targetPath>avro</targetPath>
+                <filtering>false</filtering>
+                <includes>
+                    <include>**/*.avsc</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
+</project>

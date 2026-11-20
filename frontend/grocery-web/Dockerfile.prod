@@ -1,0 +1,103 @@
+# syntax=docker/dockerfile:1.7
+# Production image of the web app: the Vite build served by unprivileged nginx (contract Phase 14 §4).
+#   - SPA with history fallback (deep links get index.html), year-long cache for content-hashed /assets/**,
+#     no-cache for index.html, gzip, security headers (CSP below), JSON access logs, /healthz;
+#   - /api/** proxied to $API_UPSTREAM (default http://api-gateway:8080) with Server-Sent Events support
+#     (no buffering, 1 h read timeout), exactly like the Vite dev proxy, so the browser keeps one origin.
+# On AWS the SPA is served from S3 + CloudFront instead (infrastructure/ci/scripts/deploy-spa.sh); this image serves
+# every other target: a "prod-like" local run, Kubernetes, a single VM.
+#
+# The dev image (Dockerfile) is unchanged. Build context = this folder (its .dockerignore drops node_modules and dist).
+#   docker build -f frontend/grocery-web/Dockerfile.prod -t grocery/frontend:<tag> \
+#     --build-arg VERSION=<semver> --build-arg REVISION=<git sha> --build-arg CREATED=<RFC 3339 time> \
+#     frontend/grocery-web
+#   docker run --rm -p 8080:8080 -e API_UPSTREAM=http://host.docker.internal:8090 grocery/frontend:<tag>
+#
+# Runtime environment:
+#   API_UPSTREAM             http(s)://host[:port] of the API gateway, no path (default http://api-gateway:8080)
+#   CONTENT_SECURITY_POLICY  overrides the default policy below (keep it in sync with the CloudFront policy)
+# Read-only root filesystem: mount writable tmpfs/emptyDir volumes at /tmp and /etc/nginx/conf.d.
+
+ARG NODE_IMAGE=node:24.22.2-alpine3.23
+ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30.6-alpine3.24
+
+# ---------------------------------------------------------------------------------------------------- build
+FROM ${NODE_IMAGE} AS build
+WORKDIR /app
+RUN chown node:node /app
+USER node
+
+# Dependencies first, so a source change does not reinstall them.
+COPY --chown=node:node package.json package-lock.json ./
+RUN --mount=type=cache,target=/home/node/.npm,uid=1000,gid=1000 \
+    npm ci --no-audit --no-fund
+
+# Only what the build reads (nginx/ and the Dockerfiles stay out of this stage's cache key).
+COPY --chown=node:node index.html vite.config.ts tsconfig.json tsconfig.app.json tsconfig.node.json ./
+COPY --chown=node:node public ./public
+COPY --chown=node:node src ./src
+# tsc -b (type check) + vite build -> /app/dist. No VITE_* build-time variables are needed: the app calls the API
+# on its own origin (/api), so one build runs in every environment.
+RUN npm run build \
+ && find dist -type d -exec chmod 0755 {} + \
+ && find dist -type f -exec chmod 0644 {} +
+
+# ---------------------------------------------------------------------------------------------------- runtime
+FROM ${NGINX_IMAGE} AS runtime
+ARG NGINX_IMAGE
+ARG VERSION=0.0.0-dev
+ARG REVISION=unknown
+ARG CREATED=unknown
+ARG SOURCE=unknown
+
+LABEL org.opencontainers.image.title="grocery-web" \
+      org.opencontainers.image.description="FreshCart web app (React SPA) served by unprivileged nginx, /api proxied to the gateway" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.created="${CREATED}" \
+      org.opencontainers.image.source="${SOURCE}" \
+      org.opencontainers.image.url="${SOURCE}" \
+      org.opencontainers.image.licenses="NOASSERTION" \
+      org.opencontainers.image.vendor="grocery" \
+      org.opencontainers.image.base.name="docker.io/${NGINX_IMAGE}"
+
+# OS patches first: the newest nginx-unprivileged alpine tag can lag behind Alpine's security fixes (the CI Trivy
+# image gate fails on fixable HIGH/CRITICAL; Dockerfile.service does the same). APK_UPGRADE=false gives the pristine base.
+# The base image's welcome-page server is replaced by our template (rendered into conf.d at start-up).
+ARG APK_UPGRADE=true
+USER root
+RUN if [ "$APK_UPGRADE" = "true" ]; then apk upgrade --no-cache; fi \
+ && rm -f /etc/nginx/conf.d/default.conf \
+ && install -d -o root -g root -m 0755 /etc/nginx/templates
+USER 101
+
+# Config and content are owned by root and read-only for nginx (uid 101); only conf.d (rendered templates) and /tmp
+# are written at run time. (Files are copied one by one: a multi-source COPY --chmod would also chmod the directory.)
+COPY --chmod=0644 nginx/nginx.conf /etc/nginx/nginx.conf
+COPY --chmod=0644 nginx/templates/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=0644 nginx/templates/security-headers.inc.template /etc/nginx/templates/security-headers.inc.template
+COPY --chmod=0755 nginx/entrypoint/16-grocery-api-upstream.envsh /docker-entrypoint.d/16-grocery-api-upstream.envsh
+COPY --from=build --chown=0:0 /app/dist /usr/share/nginx/html
+
+# CSP, source by source (what the app actually loads):
+#   script-src  'self' + Razorpay Checkout (checkout.js is injected on the payment step); no inline scripts or eval -
+#               Vite's index.html only references hashed module files.
+#   style-src   'unsafe-inline' because Razorpay Checkout injects its overlay styles; the app's own CSS is bundled
+#               (React style props and Leaflet use the CSSOM, which CSP does not restrict).
+#   img-src     data: for Leaflet's bundled CSS icons, https: for OpenStreetMap tiles, vendor product images (any
+#               https host, entered by vendors) and Razorpay's logos.
+#   connect-src 'self' covers the API and both SSE streams (fetch to /api); Razorpay's API and telemetry endpoints.
+#   frame-src   the Razorpay Checkout iframe. frame-ancestors 'none': the app is never framed.
+# No upgrade-insecure-requests here (it would break a plain-HTTP local run); CloudFront adds it on AWS.
+# Verified in Chromium (sign-in + admin pages). Zod 4 used to probe `new Function` once per page load; the app now sets
+# z.config({ jitless: true }) before any schema (src/app/zodConfig.ts), so there is no report.
+# 'unsafe-eval' is deliberately not allowed.
+ENV API_UPSTREAM=http://api-gateway:8080 \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
+    NGINX_ENVSUBST_FILTER="^(API_UPSTREAM|NGINX_LOCAL_RESOLVERS|CONTENT_SECURITY_POLICY)\$" \
+    CONTENT_SECURITY_POLICY="default-src 'self'; script-src 'self' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self' https://api.razorpay.com; frame-ancestors 'none'"
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1
+# ENTRYPOINT/CMD are the base image's: /docker-entrypoint.sh renders the templates, then runs nginx in the foreground.

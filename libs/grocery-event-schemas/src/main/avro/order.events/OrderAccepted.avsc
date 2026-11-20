@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "OrderAccepted",
+  "namespace": "com.grocery.events.order",
+  "doc": "The store accepted the paid order (status ACCEPTED). Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "readyInMinutes", "type": "int", "doc": "The store's estimate of minutes until the order is ready."},
+    {"name": "readyBy", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the store expects the order to be ready (UTC)."},
+    {"name": "acceptedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the store accepted the order (UTC)."}
+  ]
+}

@@ -1,0 +1,78 @@
+# Grocery synonyms (Solr format): every term on a line is equivalent to the others.
+# Indian (Hindi and regional) names next to their English names, plus English spelling variants.
+#
+# Used ONLY at search time (analyzer "product_search", filter "grocery_synonyms"). The lines are inlined into the
+# index settings when catalog-query-service creates an index (products_v1, restaurants_v1, categories_v1), so a
+# change takes effect for a NEW index version: bump the version in IndexDefinition, deploy, then republish
+# (POST /api/admin/catalog/republish and /api/admin/restaurants/listings/republish).
+#
+# Dairy
+curd, yogurt, yoghurt, dahi
+paneer, cottage cheese
+ghee, clarified butter
+buttermilk, chaas, chhachh
+# Flours, grains and pulses
+atta, wheat flour, whole wheat flour, chakki atta
+maida, all purpose flour, refined flour, plain flour
+besan, gram flour, chickpea flour
+rava, sooji, suji, semolina
+poha, flattened rice, beaten rice, aval
+puffed rice, murmura, kurmura
+vermicelli, sevai, semiya
+chickpea, chana, garbanzo, chole
+toor dal, arhar dal, tur dal, pigeon pea
+moong dal, mung dal, green gram
+urad dal, black gram
+masoor dal, red lentil
+rajma, kidney beans
+# Vegetables
+potato, aloo
+onion, pyaz, pyaaz, kanda
+tomato, tamatar
+brinjal, eggplant, aubergine, baingan
+lady finger, ladies finger, okra, bhindi
+capsicum, bell pepper, shimla mirch
+cauliflower, gobi, phool gobi
+cabbage, patta gobi, band gobi
+spinach, palak
+fenugreek, methi
+coriander, cilantro, dhania, coriander leaves
+mint, pudina
+curry leaves, kadi patta, curry patta
+peas, matar, green peas
+bottle gourd, lauki, doodhi, ghiya
+bitter gourd, karela
+ridge gourd, turai, tori
+drumstick, moringa, sahjan
+cucumber, kheera, kakdi
+carrot, gajar
+radish, mooli
+sweet potato, shakarkandi
+garlic, lahsun, lehsun
+ginger, adrak
+mirchi, chilli, chili, chilly, green chilli
+# Spices
+jeera, cumin
+haldi, turmeric
+mustard seeds, rai, sarson
+fennel, saunf
+cardamom, elaichi
+clove, laung
+cinnamon, dalchini
+black pepper, kali mirch
+asafoetida, hing
+tamarind, imli
+# Sweeteners, nuts and staples
+jaggery, gur, gud
+sugar, cheeni, shakkar
+salt, namak
+coconut, nariyal
+groundnut, peanut, moongphali
+cashew, kaju
+almond, badam
+raisin, kishmish
+mustard oil, sarson ka tel
+# Snacks and drinks
+biscuit, cookie
+chips, crisps, wafers
+soft drink, cold drink, soda

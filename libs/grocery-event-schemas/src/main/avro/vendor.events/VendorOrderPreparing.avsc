@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "VendorOrderPreparing",
+  "namespace": "com.grocery.events.vendor",
+  "doc": "The vendor started packing the order. Producer: vendor-service, topic vendor.events, key orderId (outbox aggregate type VendorOrder).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that received the order."},
+    {"name": "preparingAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When packing started (UTC)."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User id of the vendor user."}
+  ]
+}

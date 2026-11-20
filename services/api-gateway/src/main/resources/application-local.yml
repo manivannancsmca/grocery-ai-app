@@ -1,0 +1,6 @@
+# Run from the IDE while everything else runs in Docker:
+#   docker compose stop api-gateway   (in infrastructure/local), then run ApiGatewayApplication with profile "local".
+# identity-service is published on localhost:8101 by docker-compose.yml.
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO

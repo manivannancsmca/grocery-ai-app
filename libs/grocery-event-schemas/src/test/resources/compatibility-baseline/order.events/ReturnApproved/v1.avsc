@@ -1,0 +1,133 @@
+{
+  "type": "record",
+  "name": "ReturnApproved",
+  "namespace": "com.grocery.events.order",
+  "doc": "A return was approved by the store or an admin; payment-service refunds refundAmount and, when restock is true, inventory-service puts the items back. Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {
+      "name": "returnId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the return request."
+    },
+    {
+      "name": "returnNumber",
+      "type": "string",
+      "doc": "Human-readable return number, e.g. RT-7K3M9QX2."
+    },
+    {
+      "name": "orderId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the order (message key)."
+    },
+    {
+      "name": "orderNumber",
+      "type": "string",
+      "doc": "Human-readable order number."
+    },
+    {
+      "name": "orderType",
+      "type": "string",
+      "doc": "Store type of the order. One of: GROCERY, RESTAURANT."
+    },
+    {
+      "name": "customerId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the customer."
+    },
+    {
+      "name": "storeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."
+    },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "ReturnApprovedLine",
+          "doc": "A returned line.",
+          "fields": [
+            {
+              "name": "itemId",
+              "type": {
+                "type": "string",
+                "logicalType": "uuid"
+              },
+              "doc": "productId or menuItemId of the order line."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "doc": "Item name from the order."
+            },
+            {
+              "name": "quantity",
+              "type": "int",
+              "doc": "Quantity returned."
+            },
+            {
+              "name": "refundAmount",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              },
+              "doc": "Refund for this line, after the order's coupon discount, 2 decimals."
+            }
+          ]
+        }
+      },
+      "doc": "The approved lines."
+    },
+    {
+      "name": "refundAmount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Total to refund, 2 decimals."
+    },
+    {
+      "name": "restock",
+      "type": "boolean",
+      "doc": "True when the returned items go back into sellable stock (grocery only)."
+    },
+    {
+      "name": "decidedBy",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "User who approved it."
+    },
+    {
+      "name": "decidedByRole",
+      "type": "string",
+      "doc": "One of: STORE, ADMIN."
+    },
+    {
+      "name": "decidedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When it was approved (UTC)."
+    }
+  ]
+}

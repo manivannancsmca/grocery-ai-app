@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "DeliveryPartnerRejected",
+  "namespace": "com.grocery.events.delivery",
+  "doc": "An admin rejected the partner's submission (PENDING_APPROVAL -> REJECTED); the partner may fix and resubmit. Producer: delivery-service, topic delivery.events, key partnerId. Shared partner lifecycle payload (same fields as every DeliveryPartner* lifecycle event).",
+  "fields": [
+    {"name": "partnerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery partner, equal to the partner's user id (aggregate id and message key)."},
+    {"name": "fullName", "type": ["null", "string"], "default": null, "doc": "The partner's full name; null while the draft profile has none."},
+    {"name": "reason", "type": ["null", "string"], "default": null, "doc": "Admin's reason on DeliveryPartnerRejected and DeliveryPartnerSuspended; null for the other lifecycle events."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User who caused the change: the partner (Registered, Submitted) or the admin (Approved, Rejected, Suspended, Reinstated); null when not applicable."}
+  ]
+}

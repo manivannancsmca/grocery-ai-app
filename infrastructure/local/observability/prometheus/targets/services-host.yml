@@ -1,0 +1,38 @@
+# Scrape targets of the job "services" when the Spring Boot services run on this machine
+# (infrastructure/local/host-run/start-all.cmd; SERVICES_RUN_ON=host in infrastructure/local/.env).
+# host.docker.internal is this machine as seen from a container (Docker Desktop); the services listen on all
+# interfaces. Same ports as in Docker. Keep in step with services-docker.yml.
+- targets: ["host.docker.internal:9080"]   # the gateway's management port (its public port has no actuator)
+  labels: { service: api-gateway }
+- targets: ["host.docker.internal:8101"]
+  labels: { service: identity-service }
+- targets: ["host.docker.internal:8102"]
+  labels: { service: customer-service }
+- targets: ["host.docker.internal:8103"]
+  labels: { service: vendor-service }
+- targets: ["host.docker.internal:8104"]
+  labels: { service: restaurant-service }
+- targets: ["host.docker.internal:8105"]
+  labels: { service: catalog-command-service }
+- targets: ["host.docker.internal:8106"]
+  labels: { service: catalog-query-service }
+- targets: ["host.docker.internal:8107"]
+  labels: { service: inventory-service }
+- targets: ["host.docker.internal:8108"]
+  labels: { service: pricing-service }
+- targets: ["host.docker.internal:8109"]
+  labels: { service: cart-service }
+- targets: ["host.docker.internal:8110"]
+  labels: { service: order-service }
+- targets: ["host.docker.internal:8111"]
+  labels: { service: payment-service }
+- targets: ["host.docker.internal:8112"]
+  labels: { service: delivery-service }
+- targets: ["host.docker.internal:8113"]   # one notification replica runs on the host
+  labels: { service: notification-service }
+- targets: ["host.docker.internal:8114"]
+  labels: { service: review-service }
+- targets: ["host.docker.internal:8115"]
+  labels: { service: ai-orchestrator-service }
+- targets: ["host.docker.internal:8116"]
+  labels: { service: reporting-service }

@@ -1,0 +1,519 @@
+{
+  "consumer": {
+    "name": "order-service"
+  },
+  "interactions": [
+    {
+      "description": "a redemption of a coupon the order is too small for",
+      "key": "218c0f7a",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "coupon BIG100 needs a minimum order of 499.00",
+          "params": {
+            "code": "BIG100",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601",
+            "orderId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6d1",
+            "storeId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1"
+          }
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "code": "BIG100",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601",
+            "deliveryFee": 25.00,
+            "orderId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6d1",
+            "orderType": "GROCERY",
+            "storeId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1",
+            "subtotal": 360.00
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.customerId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.deliveryFee": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.orderId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.orderType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "GROCERY|RESTAURANT"
+                }
+              ]
+            },
+            "$.storeId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.subtotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            },
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/internal/coupons/redeem"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "errorCode": "COUPON_NOT_APPLICABLE",
+            "minOrderSubtotal": 499.00,
+            "reason": "COUPON_MIN_ORDER"
+          },
+          "contentType": "application/problem+json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/problem+json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.minOrderSubtotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/problem\\+json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 409
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a redemption of a usable coupon",
+      "key": "2d789a68",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "coupon SAVE10 can be redeemed for the order",
+          "params": {
+            "code": "SAVE10",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601",
+            "orderId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6d1",
+            "storeId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1"
+          }
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "code": "SAVE10",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601",
+            "deliveryFee": 25.00,
+            "orderId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6d1",
+            "orderType": "GROCERY",
+            "storeId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1",
+            "subtotal": 360.00
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.customerId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.deliveryFee": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.orderId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.orderType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "GROCERY|RESTAURANT"
+                }
+              ]
+            },
+            "$.storeId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.subtotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            },
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/internal/coupons/redeem"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "couponName": "Save 10%",
+            "deliveryFeeDiscount": 0.00,
+            "discount": 36.00,
+            "fundedBy": "PLATFORM",
+            "redemptionId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6e1"
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.couponName": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.deliveryFeeDiscount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.discount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.fundedBy": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "PLATFORM|STORE"
+                }
+              ]
+            },
+            "$.redemptionId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "description": "a redemption for an order that already redeemed another coupon",
+      "key": "f2960b90",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "the order already redeemed another coupon",
+          "params": {
+            "code": "SAVE10",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601",
+            "orderId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6d1",
+            "storeId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1"
+          }
+        }
+      ],
+      "request": {
+        "body": {
+          "content": {
+            "code": "SAVE10",
+            "customerId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e601",
+            "deliveryFee": 25.00,
+            "orderId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6d1",
+            "orderType": "GROCERY",
+            "storeId": "0193f1a2-5b6c-7d8e-9f01-a2b3c4d5e6b1",
+            "subtotal": 360.00
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Authorization": [
+            "Bearer contract-test-token"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.customerId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.deliveryFee": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.orderId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.orderType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "GROCERY|RESTAURANT"
+                }
+              ]
+            },
+            "$.storeId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.subtotal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Authorization": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^Bearer \\S+$"
+                }
+              ]
+            },
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/internal/coupons/redeem"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "errorCode": "COUPON_REDEMPTION_CONFLICT"
+          },
+          "contentType": "application/problem+json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/problem+json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^application/problem\\+json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 409
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.7"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  },
+  "provider": {
+    "name": "pricing-service"
+  }
+}

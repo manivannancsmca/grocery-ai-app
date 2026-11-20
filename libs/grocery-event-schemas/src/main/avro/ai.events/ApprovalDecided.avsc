@@ -1,0 +1,85 @@
+{
+  "type": "record",
+  "name": "ApprovalDecided",
+  "namespace": "com.grocery.events.ai",
+  "doc": "A human (or the expiry) decided an approval request: APPROVED, REJECTED, EXPIRED or CANCELLED. An approved request is executed next (ApprovalExecuted or ApprovalFailed). Producer: ai-orchestrator-service, topic ai.events, key approvalId.",
+  "fields": [
+    {
+      "name": "approvalId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the approval request (aggregate id and message key)."
+    },
+    {
+      "name": "action",
+      "type": "string",
+      "doc": "The proposed action. One of: PLACE_ORDER, CANCEL_ORDER, REQUEST_RETURN, REFUND_PAYMENT, ADMIN_CANCEL_ORDER, SUSPEND_VENDOR, SUSPEND_RESTAURANT, ADJUST_STOCK, CHANGE_PRICE, SEND_PURCHASE_ORDER, SET_MENU_ITEM_AVAILABILITY, ACCEPT_STORE_ORDER, REJECT_STORE_ORDER, REASSIGN_DELIVERY."
+    },
+    {
+      "name": "agent",
+      "type": "string",
+      "doc": "The assistant that proposed it. One of: shopping, admin-bi, vendor, restaurant, delivery."
+    },
+    {
+      "name": "requestedBy",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "User who was chatting with the assistant when it proposed the action."
+    },
+    {
+      "name": "onBehalfOf",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null,
+      "doc": "Customer the action is for (PLACE_ORDER, CANCEL_ORDER, REQUEST_RETURN: the requester); null for store, delivery and admin actions."
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "doc": "Server-rendered one-line summary, e.g. 'Place order: 2 items from Fresh Mart, total 285.00 INR'."
+    },
+    {
+      "name": "decision",
+      "type": "string",
+      "doc": "One of: APPROVED, REJECTED, EXPIRED, CANCELLED."
+    },
+    {
+      "name": "decidedBy",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null,
+      "doc": "User who approved, rejected or cancelled; null for EXPIRED."
+    },
+    {
+      "name": "comment",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "The decider's comment (required for REJECTED); null if none."
+    },
+    {
+      "name": "decidedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When it was decided (UTC)."
+    }
+  ]
+}

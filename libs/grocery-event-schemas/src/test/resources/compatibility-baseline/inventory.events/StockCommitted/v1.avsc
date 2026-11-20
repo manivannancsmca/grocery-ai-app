@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "StockCommitted",
+  "namespace": "com.grocery.events.inventory",
+  "doc": "The held stock of a grocery order left the store at pickup: it was removed from on-hand and reserved stock (reservation COMMITTED). Producer: inventory-service, topic inventory.events, key orderId (outbox aggregate type Reservation).",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "reservationId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the reservation."},
+    {"name": "items", "type": {"type": "array", "items": {"type": "record", "name": "StockCommittedItem", "doc": "One committed product line.", "fields": [{"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product."}, {"name": "quantity", "type": "int", "doc": "Units that left the store."}]}}, "doc": "The committed lines."},
+    {"name": "committedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the stock was committed (UTC)."}
+  ]
+}

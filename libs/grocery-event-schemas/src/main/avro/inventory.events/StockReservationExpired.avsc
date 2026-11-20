@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "StockReservationExpired",
+  "namespace": "com.grocery.events.inventory",
+  "doc": "An unconfirmed reservation outlived expiresAt and was released by the expiry poller (published together with StockReleased RESERVATION_EXPIRED). Producer: inventory-service, topic inventory.events (aggregate Reservation), key orderId. Consumer: order-service.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "reservationId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the expired reservation."}
+  ]
+}

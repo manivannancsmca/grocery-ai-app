@@ -1,0 +1,100 @@
+# Defaults = running from the IDE against the Dockerised infrastructure (profile "local").
+server:
+  port: 8113
+  shutdown: graceful
+
+grocery:
+  notification:
+    max-event-age: ${NOTIFICATION_MAX_EVENT_AGE:15m}   # older events (by the occurredAt header) only update projections
+    heartbeat-interval: 20s                            # ": hb" comment on every open stream
+    max-streams-per-user: 5                            # per replica; a 6th stream closes the oldest (REPLACED)
+    replay-limit: 200                                  # notifications replayed after Last-Event-ID, then RESYNC
+    public-signal-throttle: 2s                         # STOCK_CHANGED / PRICE_CHANGED / RESTAURANT_UPDATED per entity
+    retention: 90d                                     # notifications older than this are deleted every night
+    retention-cron: "0 30 3 * * *"                     # 03:30 India time
+    pending-event-max-age: 24h                         # parked payment events whose order never arrived: dropped (WARN)
+    location-max-age: ${NOTIFICATION_LOCATION_MAX_AGE:30s}   # Phase 9: older DeliveryLocationUpdated → dropped
+    location-throttle: 2s                              # Phase 9: at most one DELIVERY_LOCATION per order per window
+    redis-channel: grocery:realtime                    # pub/sub channel shared by every replica
+    instance-id: ${NOTIFICATION_INSTANCE_ID:${HOSTNAME:}}   # only for logs; blank = the host name
+    # Phase 12 §5: the email channel. Off unless GROCERY_MAIL_ENABLED=true (compose turns it on with Mailpit).
+    email:
+      enabled: ${GROCERY_MAIL_ENABLED:false}           # false: no email_outbox rows, no sender job
+      sender-enabled: true                             # the sender job (tests switch it off and call it themselves)
+      from: "Grocery <no-reply@grocery.local>"
+      app-base-url: ${APP_BASE_URL:http://localhost:6420}   # absolute links in the emails
+      types: [ ORDER_CONFIRMED, ORDER_CANCELLED, ORDER_DELIVERED, REFUND_COMPLETED, REFUND_FAILED, RETURN_APPROVED,
+               RETURN_REJECTED, ACCOUNT_APPROVED, ACCOUNT_REJECTED, ACCOUNT_SUSPENDED, AI_APPROVAL_REQUESTED ]
+      poll-interval: 5s                                # how often the sender looks for due emails
+      batch-size: 20                                   # emails claimed per run (FOR UPDATE SKIP LOCKED)
+      lease: 10m                                       # a claimed email is retried after this if its replica died
+      retry-delays: [ 1m, 5m, 30m ]                    # then FAILED
+
+spring:
+  application:
+    name: notification-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/notification_db?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC
+    username: ${DB_USERNAME:notification_user}
+    password: ${DB_PASSWORD:notification_pass}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000
+  # Redis pub/sub only (no keys are stored): the fan-out of every notification / signal / session to all replicas.
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 1s
+      connect-timeout: 1s
+      repositories:
+        enabled: false
+  # One consumer group over the eight domain topics (Phase 7 contract §7) plus ai.events (Phase 11) and review.events
+  # (Phase 12) and, Phase 9, a
+  # second one on delivery.location (its own listener container).
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+    listener:
+      auto-startup: ${KAFKA_LISTENERS_ENABLED:true}
+      concurrency: 3
+  # Phase 12: SMTP for the email channel (Mailpit locally: SMTP 1025, UI 8025). Short timeouts: the sender job retries.
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    default-encoding: UTF-8
+    properties:
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 10000
+  # Zero trust: this service validates every JWT itself (signature via identity JWKS, issuer, audience).
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://localhost:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://identity.grocery.local}
+          audiences: grocery-api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  # SMTP down must never make the service unhealthy: in-app notifications do not depend on it (Phase 12 §5)
+  health:
+    mail:
+      enabled: false
+
+info:
+  service: notification-service
+  phase: 12

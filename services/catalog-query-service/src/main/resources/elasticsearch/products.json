@@ -1,0 +1,96 @@
+{
+  "settings": {
+    "number_of_shards": "1",
+    "number_of_replicas": "0",
+    "analysis": {
+      "filter": {
+        "english_possessive": { "type": "stemmer", "language": "possessive_english" },
+        "english_light": { "type": "stemmer", "language": "light_english" },
+        "grocery_synonyms": { "type": "synonym_graph", "lenient": true, "synonyms": [] }
+      },
+      "analyzer": {
+        "product_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding", "english_possessive", "english_light"]
+        },
+        "product_search": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding", "english_possessive", "english_light", "grocery_synonyms"]
+        },
+        "autocomplete_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding"]
+        }
+      },
+      "normalizer": {
+        "keyword_normalizer": { "type": "custom", "filter": ["lowercase", "asciifolding"] }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "productId": { "type": "keyword" },
+      "vendorId": { "type": "keyword" },
+      "vendorName": { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "analyzer": "product_text",
+        "search_analyzer": "product_search",
+        "fields": {
+          "keyword": { "type": "keyword", "normalizer": "keyword_normalizer", "ignore_above": 256 },
+          "sayt": { "type": "search_as_you_type", "analyzer": "autocomplete_text" }
+        }
+      },
+      "description": { "type": "text", "analyzer": "product_text", "search_analyzer": "product_search" },
+      "brandId": { "type": "keyword" },
+      "brandName": {
+        "type": "text",
+        "analyzer": "product_text",
+        "search_analyzer": "product_search",
+        "fields": {
+          "keyword": { "type": "keyword", "normalizer": "keyword_normalizer", "ignore_above": 256 }
+        }
+      },
+      "brandFacet": { "type": "keyword" },
+      "categoryId": { "type": "keyword" },
+      "categoryIds": { "type": "keyword" },
+      "categoryNames": { "type": "text", "analyzer": "product_text", "search_analyzer": "product_search" },
+      "categoryFacet": { "type": "keyword" },
+      "categoryPath": { "type": "object", "enabled": false },
+      "unitValue": { "type": "double" },
+      "unitOfMeasure": { "type": "keyword" },
+      "unitLabel": { "type": "keyword", "index": false },
+      "sku": { "type": "keyword" },
+      "barcode": { "type": "keyword" },
+      "foodType": { "type": "keyword" },
+      "tags": {
+        "type": "keyword",
+        "fields": {
+          "text": { "type": "text", "analyzer": "product_text", "search_analyzer": "product_search" }
+        }
+      },
+      "attributes": { "type": "object", "enabled": false },
+      "imageUrls": { "type": "keyword", "index": false, "doc_values": false },
+      "primaryImageUrl": { "type": "keyword", "index": false, "doc_values": false },
+      "status": { "type": "keyword" },
+      "visible": { "type": "boolean" },
+      "publishedAt": { "type": "date" },
+      "updatedAt": { "type": "date" },
+      "productVersion": { "type": "long" },
+      "mrp": { "type": "scaled_float", "scaling_factor": 100 },
+      "sellingPrice": { "type": "scaled_float", "scaling_factor": 100 },
+      "currency": { "type": "keyword" },
+      "discountPercent": { "type": "short" },
+      "priceVersion": { "type": "long" },
+      "inStock": { "type": "boolean" },
+      "stockVersion": { "type": "long" },
+      "rating": { "type": "scaled_float", "scaling_factor": 100 },
+      "ratingCount": { "type": "integer" },
+      "ratingVersion": { "type": "long" }
+    }
+  }
+}

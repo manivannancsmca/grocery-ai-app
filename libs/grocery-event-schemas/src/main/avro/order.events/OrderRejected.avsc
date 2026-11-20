@@ -1,0 +1,24 @@
+{
+  "type": "record",
+  "name": "OrderRejected",
+  "namespace": "com.grocery.events.order",
+  "doc": "The order could not be fulfilled (CREATED -> REJECTED); nothing was paid. Producer: order-service, topic order.events, key orderId. Consumer: notification later.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "reason", "type": "string", "doc": "Rejection reason. One of: OUT_OF_STOCK."},
+    {"name": "unavailableItems", "type": {"type": "array", "items": {
+      "type": "record",
+      "name": "OrderRejectedUnavailableItem",
+      "doc": "A line that could not be fulfilled.",
+      "fields": [
+        {"name": "itemId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "productId of the line."},
+        {"name": "requested", "type": "int", "doc": "Quantity the order asked for."},
+        {"name": "available", "type": "int", "doc": "Quantity available at the time."}
+      ]
+    }}, "doc": "The lines that lack stock."}
+  ]
+}

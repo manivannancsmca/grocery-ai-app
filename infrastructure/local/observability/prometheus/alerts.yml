@@ -1,0 +1,248 @@
+# =====================================================================================
+# Alert rules (Phase 13 §2). The same expressions become Amazon Managed Prometheus rules in AWS (Phase 14).
+# Severity → Alertmanager repeat interval: critical 1h, warning 4h, info 24h (alertmanager.yml).
+# Unit tests: tests/alerts.test.yml  (run: infrastructure/local/observability/validate.sh)
+# Runbook: docs/operations/troubleshooting.md
+# =====================================================================================
+groups:
+  - name: grocery-services
+    rules:
+      # A service that answered at least once in the last 24 h and now does not. Services of compose profiles that
+      # were never started (e.g. notification-service-2 without "realtime-ha") are DOWN targets but do not alert.
+      - alert: ServiceDown
+        expr: |
+          up{job="services"} == 0
+          and on (job, instance)
+          max_over_time(up{job="services"}[24h]) == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} is down"
+          description: "Prometheus cannot scrape {{ $labels.instance }} (/actuator/prometheus) for more than 1 minute."
+          dashboard: "http://localhost:3000/d/grocery-overview"
+          runbook: "docs/operations/troubleshooting.md#servicedown"
+
+      - alert: HighErrorRate
+        expr: |
+          sum by (service) (rate(http_server_requests_seconds_count{job="services", status=~"5.."}[5m]))
+          /
+          sum by (service) (rate(http_server_requests_seconds_count{job="services"}[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }}: {{ $value | humanizePercentage }} of requests fail with 5xx"
+          description: "More than 5 % of HTTP requests answered 5xx over the last 5 minutes."
+          dashboard: "http://localhost:3000/d/grocery-service?var-service={{ $labels.service }}"
+          runbook: "docs/operations/troubleshooting.md#higherrorrate--slowrequests"
+
+      # p95 per service. Long-lived streams are excluded: SSE (/api/notifications/stream) and the assistant chat
+      # (/api/ai/agents/{agent}/chat). The gateway reports proxied requests as uri="UNKNOWN", so its p95 comes from the
+      # Spring Cloud Gateway route timer instead, without the two streaming routes.
+      - alert: SlowRequests
+        expr: |
+          (
+            histogram_quantile(0.95, sum by (service, le) (rate(http_server_requests_seconds_bucket{job="services", service!="api-gateway", uri!~".*/stream|.*/chat"}[5m])))
+            or
+            histogram_quantile(0.95, sum by (service, le) (rate(spring_cloud_gateway_requests_seconds_bucket{job="services", routeId!~".*stream.*"}[5m])))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }}: p95 latency {{ $value | humanizeDuration }}"
+          description: "95th percentile of HTTP request duration is above 1 s for 10 minutes (streams excluded)."
+          dashboard: "http://localhost:3000/d/grocery-service?var-service={{ $labels.service }}"
+          runbook: "docs/operations/troubleshooting.md#higherrorrate--slowrequests"
+
+      - alert: JvmHeapHigh
+        expr: |
+          sum by (service, instance) (jvm_memory_used_bytes{job="services", area="heap"})
+          /
+          sum by (service, instance) (jvm_memory_max_bytes{job="services", area="heap"} > 0)
+          > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }}: heap {{ $value | humanizePercentage }} used"
+          description: "JVM heap used / max above 90 % for 10 minutes; the container may be undersized or leaking."
+          dashboard: "http://localhost:3000/d/grocery-service?var-service={{ $labels.service }}"
+          runbook: "docs/operations/troubleshooting.md#jvmheaphigh"
+
+  - name: grocery-events
+    rules:
+      - alert: KafkaConsumerLagHigh
+        expr: sum by (consumergroup) (clamp_min(kafka_consumergroup_lag, 0)) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer group {{ $labels.consumergroup }} lags {{ $value }} records"
+          description: "Total lag of the consumer group above 100 records for 5 minutes."
+          dashboard: "http://localhost:3000/d/grocery-kafka"
+          runbook: "docs/operations/troubleshooting.md#kafkaconsumerlaghigh"
+
+      - alert: DeadLettersPending
+        expr: max by (service, consumer_group) (grocery_dead_letters_pending) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} dead letter(s) pending for {{ $labels.consumer_group }}"
+          description: "Events of {{ $labels.service }} failed processing and wait in a DLT (Operations → Dead letters)."
+          dashboard: "http://localhost:3000/d/grocery-kafka"
+          runbook: "docs/operations/troubleshooting.md#deadletterspending"
+
+      # Debezium outbox relay: a connector or one of its tasks is not RUNNING (failed, paused, unassigned …).
+      # The connect-watchdog restarts FAILED tasks up to 3 times per 10 minutes; this fires when that did not help.
+      - alert: ConnectorTaskFailed
+        expr: |
+          max by (connector, task, status) (kafka_connect_connector_task_status{status!="running"}) == 1
+          or
+          max by (connector, status) (kafka_connect_connector_status{status!="running"}) == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka Connect {{ $labels.connector }} {{ with $labels.task }}task {{ . }} {{ end }}is {{ $labels.status }}"
+          description: "Outbox events of this connector are not published while it is not running."
+          dashboard: "http://localhost:3000/d/grocery-kafka"
+          runbook: "docs/operations/troubleshooting.md#connectortaskfailed"
+
+  - name: grocery-business
+    rules:
+      - alert: StuckOrders
+        expr: max by (service, reason) (grocery_orders_stuck) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} stuck order(s): {{ $labels.reason }}"
+          description: "The order watchdog flagged orders that stay too long in a status (Operations → Stuck orders)."
+          dashboard: "http://localhost:3000/d/grocery-business"
+          runbook: "docs/operations/troubleshooting.md#stuckorders"
+
+      - alert: PaymentFailureSpike
+        expr: |
+          (
+            sum by (service) (increase(grocery_events_published_total{event_type="PaymentFailed"}[15m]))
+            /
+            sum by (service) (increase(grocery_events_published_total{event_type=~"PaymentFailed|PaymentCaptured"}[15m]))
+          ) > 0.3
+          and
+          sum by (service) (increase(grocery_events_published_total{event_type=~"PaymentFailed|PaymentCaptured"}[15m])) >= 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of payment attempts failed in 15 minutes"
+          description: "Failed / (failed + captured) payments above 30 % with at least 5 attempts in 15 minutes."
+          dashboard: "http://localhost:3000/d/grocery-business"
+          runbook: "docs/operations/troubleshooting.md#paymentfailurespike--reconciliationfailures"
+
+      - alert: ReconciliationFailures
+        expr: sum by (service) (increase(grocery_payments_reconciliation_failures_total[15m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Payment reconciliation failed {{ $value | printf \"%.0f\" }} time(s) in 15 minutes"
+          description: "The reconciliation job could not check payments at the provider (GET /api/admin/payments/reconciliation)."
+          dashboard: "http://localhost:3000/d/grocery-business"
+          runbook: "docs/operations/troubleshooting.md#paymentfailurespike--reconciliationfailures"
+
+      - alert: AiModelUnavailable
+        expr: max by (service, provider) (grocery_ai_model_available) == 0
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "AI model provider {{ $labels.provider }} unavailable"
+          description: "Assistant chats answer AI_UNAVAILABLE until the model is reachable (Ollama pulled and running?)."
+          dashboard: "http://localhost:3000/d/grocery-business"
+          runbook: "docs/operations/troubleshooting.md#aimodelunavailable"
+
+      - alert: EmailFailures
+        expr: sum by (service) (increase(grocery_emails_total{status="FAILED"}[30m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} email(s) failed in 30 minutes"
+          description: "notification-service could not hand emails to SMTP; the email outbox retries them."
+          dashboard: "http://localhost:3000/d/grocery-business"
+          runbook: "docs/operations/troubleshooting.md#emailfailures"
+
+  - name: grocery-infrastructure
+    rules:
+      - alert: DatabaseDown
+        expr: mysql_up == 0 or up{job="mysql"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL is unreachable"
+          description: "mysqld-exporter cannot connect to mysql:3306 (or the exporter itself is down)."
+          dashboard: "http://localhost:3000/d/grocery-data"
+          runbook: "docs/operations/troubleshooting.md#databasedown--redisdown--elasticsearchdown"
+
+      - alert: RedisDown
+        expr: redis_up == 0 or up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is unreachable"
+          description: "redis-exporter cannot connect to redis:6379 (or the exporter itself is down)."
+          dashboard: "http://localhost:3000/d/grocery-data"
+          runbook: "docs/operations/troubleshooting.md#databasedown--redisdown--elasticsearchdown"
+
+      # Elasticsearch runs only with the search/catalog profiles: alert only when it was up in the last 24 h.
+      # elasticsearch-exporter 1.11 has no elasticsearch_cluster_health_up; its per-scrape "is ES reachable" signal is
+      # the cluster-info collector's scrape_success (elasticsearch_clusterinfo_up refreshes only every 5 minutes).
+      - alert: ElasticsearchDown
+        expr: |
+          (
+            max by (job, instance) (elasticsearch_scrape_success{collector="cluster-info"}) == 0
+            or up{job="elasticsearch"} == 0
+          )
+          and on (job, instance)
+          max by (job, instance) (max_over_time(elasticsearch_scrape_success{collector="cluster-info"}[24h])) == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Elasticsearch is unreachable"
+          description: "elasticsearch-exporter cannot read the cluster health of elasticsearch:9200."
+          dashboard: "http://localhost:3000/d/grocery-data"
+          runbook: "docs/operations/troubleshooting.md#databasedown--redisdown--elasticsearchdown"
+
+      # Not in the Phase 13 table: an exporter or observability component that cannot be scraped hides the alerts
+      # that depend on it.
+      - alert: MonitoringTargetDown
+        expr: up{job!="services"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scrape target {{ $labels.job }} ({{ $labels.instance }}) is down"
+          description: "Alerts that depend on this target cannot fire while it is down."
+          dashboard: "http://localhost:9090/targets"
+          runbook: "docs/operations/troubleshooting.md#monitoringtargetdown"
+
+      # Not in the Phase 13 table: the log shipper can wedge (seen in the Phase 13 load test: a Docker API error under
+      # load) while its own /metrics still answers, so MonitoringTargetDown stays quiet. Kafka and Kafka Connect alone
+      # log several lines a minute, so ten minutes without a single line reaching Loki means logs are being lost.
+      - alert: LogShippingStalled
+        expr: sum(rate(loki_distributor_lines_received_total[10m])) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No log line has reached Loki for 15 minutes"
+          description: "Alloy is not shipping container logs; restart it (docker restart grocery-alloy-1). Lines written meanwhile are read again from the container logs."
+          dashboard: "http://localhost:3000/d/grocery-overview"
+          runbook: "docs/operations/troubleshooting.md#logshippingstalled"

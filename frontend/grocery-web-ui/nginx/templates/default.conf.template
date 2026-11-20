@@ -1,0 +1,96 @@
+# Server block of the production web image. Rendered at container start by the base image's entrypoint
+# (20-envsubst-on-templates.sh) into /etc/nginx/conf.d/default.conf. Only the variables listed in
+# NGINX_ENVSUBST_FILTER are substituted (API_UPSTREAM, NGINX_LOCAL_RESOLVERS, CONTENT_SECURITY_POLICY); every other
+# dollar name below is an nginx variable and is left alone.
+
+# HSTS only when the request reached us over HTTPS (TLS terminated by a load balancer / CDN in front). On plain
+# HTTP (a local run) the header would be ignored anyway, and an empty value makes nginx omit it.
+map $http_x_forwarded_proto $grocery_hsts {
+    https   "max-age=31536000; includeSubDomains";
+    default "";
+}
+
+# Keep the scheme the client used when a proxy in front already set it.
+map $http_x_forwarded_proto $grocery_forwarded_proto {
+    ""      $scheme;
+    default $http_x_forwarded_proto;
+}
+
+server {
+    listen 8080 default_server;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+    charset utf-8;
+    absolute_redirect off;   # redirects keep the host/port the browser used (the published port differs)
+
+    # The /api upstream is a variable, so nginx resolves it at request time (and re-resolves every 30 s): the
+    # container starts even when the gateway is not up yet, and a load balancer's changing IPs are followed.
+    # NGINX_LOCAL_RESOLVERS comes from /etc/resolv.conf (15-local-resolvers.envsh). Note: nginx's resolver is
+    # DNS only - names that exist only in /etc/hosts (e.g. ECS Service Connect aliases) cannot be used here.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=30s ipv6=off;
+    resolver_timeout 5s;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # ---------------------------------------------------------------- API (same origin, like the Vite dev proxy)
+    # The gateway owns the API's response headers (it already sends nosniff, X-Frame-Options, Cache-Control ...),
+    # so none of the SPA headers are added here.
+    location /api/ {
+        set $grocery_api_upstream "${API_UPSTREAM}";
+        proxy_pass $grocery_api_upstream;   # no URI part: the original request URI (/api/...) is passed unchanged
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        # Keep the browser's Host (with its port): the gateway's CORS check compares Origin with the request's own
+        # host, so a same-origin call must still look same-origin there (otherwise Spring answers 403 to every
+        # browser request whose Origin is not in grocery.gateway.allowed-origins).
+        proxy_set_header Host              $http_host;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;   # the gateway trusts the last hop
+        proxy_set_header X-Forwarded-Proto $grocery_forwarded_proto;
+        proxy_set_header X-Forwarded-Host  $http_host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_ssl_server_name on;          # SNI when API_UPSTREAM is https://
+
+        # Server-Sent Events (/api/notifications/stream, /api/ai/agents/*/chat): pass every byte through at once.
+        # The services also send "X-Accel-Buffering: no"; turning buffering off here covers every stream.
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 1h;
+        proxy_read_timeout 1h;             # streams stay open; the notification stream sends a heartbeat every 20 s
+        gzip off;                          # compression would buffer streams (and BREACH-style leaks of tokens)
+    }
+
+    # ---------------------------------------------------------------- SPA
+    # Vite puts every content-hashed file under /assets/: cache it for a year. A missing asset is a real 404 - never
+    # index.html - so an old tab or a CDN can never cache HTML under a .js name.
+    location /assets/ {
+        include /etc/nginx/conf.d/security-headers.inc;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # The entry point must always be revalidated, so a new release is picked up on the next navigation.
+    location = /index.html {
+        include /etc/nginx/conf.d/security-headers.inc;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    # History-API fallback: every other path that is not a file (deep links such as /orders/42) gets index.html,
+    # and React Router renders the route. Root files without a hash (favicon.svg) are revalidated too.
+    location / {
+        include /etc/nginx/conf.d/security-headers.inc;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri /index.html;
+    }
+
+    # Dot-files (none are shipped) are never served.
+    location ~ /\. {
+        return 404;
+    }
+}

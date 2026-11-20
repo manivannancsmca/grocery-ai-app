@@ -1,0 +1,33 @@
+# Weekly dependency update pull requests. Each one runs the CI workflow (tests + security gates) before it can merge.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+
+  - package-ecosystem: npm
+    directory: /frontend/grocery-web-ui
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: maven
+    directories:
+      - /libs/*
+      - /services/*
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories:
+      - /infrastructure/ci/docker
+      - /infrastructure/k8s/platform-init
+      - /frontend/grocery-web-ui
+    schedule: { interval: weekly }

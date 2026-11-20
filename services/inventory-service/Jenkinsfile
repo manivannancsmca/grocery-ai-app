@@ -1,0 +1,11 @@
+// inventory-service: build, test, scan, image and deploy this service on its own (contract Phase 14 §6).
+// Stages, parameters (DRY_RUN, VALIDATE_ONLY) and options: infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryServicePipeline(
+    service: 'inventory-service',
+    port: 8107,
+    producesEvents: true,   // outbox -> Debezium: register its schemas before each deployment
+    hasContracts: true,      // Pact provider: verifies contracts/pacts/*-inventory-service.json
+    testcontainers: true
+)

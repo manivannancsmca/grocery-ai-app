@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "UserReactivated",
+  "namespace": "com.grocery.events.identity",
+  "doc": "An admin reactivated a suspended user account. Producer: identity-service, topic identity.events, key userId.",
+  "fields": [
+    {"name": "userId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the reactivated user."},
+    {"name": "reactivatedBy", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the admin who reactivated the account."}
+  ]
+}

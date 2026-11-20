@@ -1,0 +1,85 @@
+{
+  "type": "record",
+  "name": "ReviewSubmitted",
+  "namespace": "com.grocery.events.review",
+  "doc": "A customer submitted or edited a review of something from a delivered order; it is PUBLISHED at once unless automatic moderation FLAGGED it for an admin. Producer: review-service, topic review.events, key reviewId.",
+  "fields": [
+    {
+      "name": "reviewId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the review (message key)."
+    },
+    {
+      "name": "targetType",
+      "type": "string",
+      "doc": "What is reviewed. One of: PRODUCT, MENU_ITEM, VENDOR, RESTAURANT, DELIVERY_PARTNER."
+    },
+    {
+      "name": "targetId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the product, menu item, vendor, restaurant or delivery partner."
+    },
+    {
+      "name": "storeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "vendorId or restaurantId of the order the review comes from (the store that is notified)."
+    },
+    {
+      "name": "customerId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "The reviewing customer."
+    },
+    {
+      "name": "orderId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "The delivered order the review is based on."
+    },
+    {
+      "name": "rating",
+      "type": "int",
+      "doc": "1 to 5 stars."
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "doc": "One of: PUBLISHED, FLAGGED."
+    },
+    {
+      "name": "flagReason",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Why automatic moderation flagged it (e.g. LINK, PROFANITY); null when PUBLISHED."
+    },
+    {
+      "name": "edited",
+      "type": "boolean",
+      "doc": "True when an existing review was edited."
+    },
+    {
+      "name": "submittedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When it was submitted (UTC)."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+// cart-service: build, test, scan, image and deploy this service on its own (contract Phase 14 §6).
+// Stages, parameters (DRY_RUN, VALIDATE_ONLY) and options: infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryServicePipeline(
+    service: 'cart-service',
+    port: 8109,
+    producesEvents: false,   // publishes no events through the outbox
+    hasContracts: true,      // Pact consumer of 6 services + provider for order-service
+    testcontainers: true
+)

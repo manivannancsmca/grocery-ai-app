@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "CategoryChanged",
+  "namespace": "com.grocery.events.catalog",
+  "doc": "The complete category snapshot, published on create, edit, move, (de)activation, delete (deleted = true, last event of the category) and republish. Producer: catalog-command-service, topic catalog.events, key categoryId. categoryVersion is the search index's external version.",
+  "fields": [
+    {"name": "categoryId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the category (aggregate id and message key)."},
+    {"name": "parentId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "Id of the parent category; null for a root category."},
+    {"name": "name", "type": "string", "doc": "Category name."},
+    {"name": "description", "type": ["null", "string"], "default": null, "doc": "Category description; null if none."},
+    {"name": "imageUrl", "type": ["null", "string"], "default": null, "doc": "Image URL; null if none."},
+    {"name": "sortOrder", "type": "int", "doc": "Sort order among siblings (lower first)."},
+    {"name": "depth", "type": "int", "doc": "Depth in the tree: 1 for a root category, at most 3."},
+    {"name": "path", "type": {"type": "array", "items": {
+      "type": "record",
+      "name": "CategoryChangedIdName",
+      "doc": "A category id with its name.",
+      "fields": [
+        {"name": "id", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the category."},
+        {"name": "name", "type": "string", "doc": "Name of the category."}
+      ]
+    }}, "doc": "Path from the root category to this category (inclusive)."},
+    {"name": "active", "type": "boolean", "doc": "The category's own active flag."},
+    {"name": "effectiveActive", "type": "boolean", "doc": "Own flag AND every parent active."},
+    {"name": "deleted", "type": "boolean", "doc": "True on the last snapshot of a category that is being deleted."},
+    {"name": "categoryVersion", "type": "long", "doc": "Strictly increasing per category with every change; a republish re-sends the current version unchanged."}
+  ]
+}

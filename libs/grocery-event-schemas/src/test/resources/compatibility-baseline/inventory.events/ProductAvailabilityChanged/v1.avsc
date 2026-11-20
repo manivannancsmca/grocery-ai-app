@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "ProductAvailabilityChanged",
+  "namespace": "com.grocery.events.inventory",
+  "doc": "A product went in or out of stock (published only on that transition, and on republish). Producer: inventory-service, topic inventory.events (aggregate Stock), key productId. stockVersion is the search index's external version.",
+  "fields": [
+    {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product (message key)."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that owns the stock."},
+    {"name": "inStock", "type": "boolean", "doc": "True when the available quantity is above zero."},
+    {"name": "stockVersion", "type": "long", "doc": "Strictly increasing per product with every stock change; a republish re-sends the current version unchanged."}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "PriceChangeRejected",
+  "namespace": "com.grocery.events.pricing",
+  "doc": "An admin rejected a pending price change request; the live price is unchanged. Producer: pricing-service, topic pricing.events, key productId.",
+  "fields": [
+    {"name": "requestId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the price change request."},
+    {"name": "productId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the product (message key)."},
+    {"name": "vendorId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the vendor that requested the change."},
+    {"name": "rejectedBy", "type": {"type": "string", "logicalType": "uuid"}, "doc": "User id of the rejecting admin."},
+    {"name": "reason", "type": "string", "doc": "The admin's reason (required by the API, trimmed, at most 300 characters)."}
+  ]
+}

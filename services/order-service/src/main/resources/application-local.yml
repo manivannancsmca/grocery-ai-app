@@ -1,0 +1,15 @@
+# Run from the IDE while everything else runs in Docker:
+#   docker compose stop order-service   (in infrastructure/local), then run OrderServiceApplication with profile
+#   "local" (MySQL on localhost:3307, Kafka on localhost:9092, cart-service on localhost:8109, pricing-service on
+#   localhost:8108).
+grocery:
+  order:
+    services:
+      cart: http://localhost:8109
+      pricing: http://localhost:8108
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.grocery: DEBUG

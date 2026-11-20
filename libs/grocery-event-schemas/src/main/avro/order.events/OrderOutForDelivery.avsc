@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "OrderOutForDelivery",
+  "namespace": "com.grocery.events.order",
+  "doc": "The partner picked the order up (status OUT_FOR_DELIVERY); inventory commits the held stock. Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "partnerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery partner."},
+    {"name": "pickedUpAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order was picked up (UTC)."}
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "UserRegistered",
+  "namespace": "com.grocery.events.identity",
+  "doc": "A user account was created by self-registration. Producer: identity-service, topic identity.events, key userId. Consumers create the role-specific profile (customer, vendor, restaurant, delivery partner).",
+  "fields": [
+    {"name": "userId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the new user account."},
+    {"name": "email", "type": "string", "doc": "Login e-mail address, trimmed and lower-cased."},
+    {"name": "fullName", "type": "string", "doc": "Full name as registered (trimmed)."},
+    {"name": "phone", "type": ["null", "string"], "default": null, "doc": "Phone number (10-15 digits, optional leading +); null when none was given."},
+    {"name": "role", "type": "string", "doc": "The role the user registered with. One of: CUSTOMER, VENDOR, RESTAURANT_OWNER, DELIVERY_PARTNER."},
+    {"name": "registeredAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the account was created (UTC)."}
+  ]
+}

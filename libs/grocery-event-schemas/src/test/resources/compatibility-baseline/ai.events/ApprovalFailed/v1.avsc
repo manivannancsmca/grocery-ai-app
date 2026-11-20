@@ -1,0 +1,94 @@
+{
+  "type": "record",
+  "name": "ApprovalFailed",
+  "namespace": "com.grocery.events.ai",
+  "doc": "An approved action could not be executed (status FAILED); nothing was changed unless the target says otherwise. A new proposal is needed. Producer: ai-orchestrator-service, topic ai.events, key approvalId.",
+  "fields": [
+    {
+      "name": "approvalId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the approval request (aggregate id and message key)."
+    },
+    {
+      "name": "action",
+      "type": "string",
+      "doc": "The proposed action. One of: PLACE_ORDER, CANCEL_ORDER, REFUND_PAYMENT, ADMIN_CANCEL_ORDER, SUSPEND_VENDOR, SUSPEND_RESTAURANT."
+    },
+    {
+      "name": "agent",
+      "type": "string",
+      "doc": "The assistant that proposed it. One of: shopping, admin-bi."
+    },
+    {
+      "name": "requestedBy",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "User who was chatting with the assistant when it proposed the action."
+    },
+    {
+      "name": "onBehalfOf",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null,
+      "doc": "Customer the action is for (PLACE_ORDER, CANCEL_ORDER: the requester); null for admin actions."
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "doc": "Server-rendered one-line summary, e.g. 'Place order: 2 items from Fresh Mart, total 285.00 INR'."
+    },
+    {
+      "name": "decidedBy",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null,
+      "doc": "User who approved it; null when execution never started."
+    },
+    {
+      "name": "errorCode",
+      "type": "string",
+      "doc": "Error code from the target service or the orchestrator, e.g. TOTAL_CHANGED, APPROVAL_BODY_MISMATCH, TARGET_UNAVAILABLE."
+    },
+    {
+      "name": "errorMessage",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Human-readable error; null if none."
+    },
+    {
+      "name": "httpStatus",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "HTTP status the target answered; null when it was not reached."
+    },
+    {
+      "name": "failedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When execution failed (UTC)."
+    }
+  ]
+}

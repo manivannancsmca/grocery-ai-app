@@ -1,0 +1,9 @@
+// grocery-event-schemas: build and test, BACKWARD_TRANSITIVE compatibility gate, scan, publish to CodeArtifact,
+// and the schema-init image (grocery/schema-init:<version>) the producers' pipelines run before they deploy.
+// See infrastructure/ci/README.md
+@Library('grocery') _
+
+groceryLibraryPipeline(
+    library: 'grocery-event-schemas',
+    schemas: true
+)

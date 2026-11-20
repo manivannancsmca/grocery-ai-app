@@ -1,0 +1,7 @@
+# Accepted Trivy findings of the CI gates that concern only the CI images (Dockerfile.service, Dockerfile.schema-init).
+# The pipeline merges this file with tests/security/.trivyignore (repository-wide accepted findings) and, when it
+# exists, <module>/.trivyignore. Same rules as there: one id per line with `exp:YYYY-MM-DD` (the finding comes back
+# after that date and must be re-reviewed) and a comment above it: why, where, what fix to watch for.
+# Fixable dependency vulnerabilities are fixed in the build (dependency upgrade), not accepted here.
+#
+# (No accepted findings yet.)

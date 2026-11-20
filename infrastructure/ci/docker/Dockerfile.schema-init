@@ -1,0 +1,48 @@
+# syntax=docker/dockerfile:1.7
+# =====================================================================================================================
+# schema-init: the one-off ECS task that registers the central Avro event schemas in the environment's Confluent
+# Schema Registry (contract Phase 14 §5 "Event schemas"; Terraform one-off task grocery-<env>-schema-init, ECR
+# repository grocery/schema-init). Same script as the local "schema-init" container:
+# infrastructure/local/schema-registry/register-schemas.sh (pins BACKWARD_TRANSITIVE per subject, asks the registry
+# before registering, never registers an incompatible schema).
+#
+# Built by the grocery-event-schemas library pipeline and tagged with the library version (immutable in ECR), so a
+# producer's pipeline registers exactly the schemas of the grocery-event-schemas version it was built against.
+# Build context = repository root:
+#   docker build -f infrastructure/ci/docker/Dockerfile.schema-init --build-arg VERSION=1.7.0 \
+#     --build-arg REVISION=<git sha> --build-arg CREATED=<RFC 3339 time> -t grocery/schema-init:1.7.0 .
+# Runtime environment (set by the task definition): SCHEMA_REGISTRY_URL, SCHEMAS_DIR=/schemas,
+# SCHEMA_COMPATIBILITY=BACKWARD_TRANSITIVE. Exit code 0 = every schema registered (or already registered).
+# =====================================================================================================================
+ARG BASE_IMAGE=alpine:3.24.3
+FROM ${BASE_IMAGE}
+ARG BASE_IMAGE
+ARG VERSION=0.0.0-dev
+ARG REVISION=unknown
+ARG CREATED=unknown
+ARG SOURCE=unknown
+
+LABEL org.opencontainers.image.title="schema-init" \
+      org.opencontainers.image.description="Registers the grocery Avro event schemas (BACKWARD_TRANSITIVE) in a Confluent Schema Registry" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.created="${CREATED}" \
+      org.opencontainers.image.source="${SOURCE}" \
+      org.opencontainers.image.vendor="grocery" \
+      org.opencontainers.image.licenses="NOASSERTION" \
+      org.opencontainers.image.base.name="docker.io/library/${BASE_IMAGE}"
+
+# bash + curl as the script expects; coreutils for `head -n -1`.
+RUN apk upgrade --no-cache \
+ && apk add --no-cache bash curl coreutils \
+ && addgroup -S -g 10001 app \
+ && adduser -S -D -H -u 10001 -G app -h /schemas -s /sbin/nologin app
+
+# (no --chmod on the directory copy: it would also apply to the directories and make them non-traversable)
+COPY libs/grocery-event-schemas/src/main/avro/ /schemas/
+COPY --chmod=0755 infrastructure/local/schema-registry/register-schemas.sh /usr/local/bin/register-schemas.sh
+
+ENV SCHEMAS_DIR=/schemas \
+    SCHEMA_COMPATIBILITY=BACKWARD_TRANSITIVE
+USER 10001:10001
+ENTRYPOINT ["bash", "/usr/local/bin/register-schemas.sh"]

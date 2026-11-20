@@ -1,0 +1,119 @@
+// =====================================================================================
+// Grafana Alloy — ships the Docker logs of the compose project "grocery" (and nothing else on this machine) to Loki.
+//
+// Labels (stream selectors): ONLY  service  and  level.
+//   service = the ECS "service.name" of Spring services (= spring.application.name, the same value as the
+//             Prometheus "service" label; both notification replicas share it), else the compose service name.
+//   level   = ECS "log.level" (Spring) or the level word of plain-text infrastructure logs, lower case.
+// Structured metadata (filterable, not indexed): traceId, spanId, correlationId, container.
+//   {service="order-service"} | traceId="4bf92f3577b34da6a3ce929d0e0e4736"
+// The log line itself is kept as is (the full ECS JSON), so "| json" works on it in LogQL.
+// =====================================================================================
+
+logging {
+  level  = "warn"
+  format = "logfmt"
+}
+
+discovery.docker "grocery" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "15s"
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=grocery"]
+  }
+}
+
+discovery.relabel "grocery" {
+  targets = discovery.docker.grocery.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  // Temporary label, moved to structured metadata in loki.process below.
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "grocery" {
+  host             = "unix:///var/run/docker.sock"
+  targets          = discovery.relabel.grocery.output
+  refresh_interval = "15s"
+  forward_to       = [loki.process.grocery.receiver]
+}
+
+loki.process "grocery" {
+  forward_to = [loki.write.loki.receiver]
+
+  // Spring services: ECS JSON (Spring Boot structured logging), nested log.level / service.name; MDC keys top level.
+  stage.match {
+    selector = "{service=~\".+\"} |~ \"^\\\\{\""
+
+    stage.json {
+      expressions = {
+        level         = "log.level",
+        app           = "service.name",
+        traceId       = "traceId",
+        spanId        = "spanId",
+        correlationId = "correlationId",
+      }
+    }
+
+    stage.labels {
+      values = { service = "app" }
+    }
+  }
+
+  // Plain-text infrastructure logs (Kafka, Connect, Schema Registry, MySQL ...): the first level word.
+  stage.match {
+    selector = "{service=~\".+\"} !~ \"^\\\\{\""
+
+    stage.regex {
+      expression = "^.{0,100}?\\b(?P<level>TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\\b"
+    }
+
+    stage.regex {
+      expression = "^\\S+ \\d+ \\[(?P<mysql_level>Note|System|Warning|ERROR)\\]"
+    }
+
+    stage.template {
+      source   = "level"
+      template = "{{ if .mysql_level }}{{ .mysql_level }}{{ else if .Value }}{{ .Value }}{{ end }}"
+    }
+  }
+
+  stage.template {
+    source   = "level"
+    // lines without a level word keep no level label (an empty value adds no label)
+    template = "{{ if .Value }}{{ $l := ToLower .Value }}{{ if or (eq $l \"warning\") (eq $l \"warn\") }}warn{{ else if or (eq $l \"note\") (eq $l \"system\") }}info{{ else }}{{ $l }}{{ end }}{{ end }}"
+  }
+
+  stage.labels {
+    values = { level = "" }
+  }
+
+  stage.structured_metadata {
+    values = {
+      traceId       = "",
+      spanId        = "",
+      correlationId = "",
+      container     = "",
+    }
+  }
+
+  stage.label_drop {
+    values = ["container"]
+  }
+}
+
+loki.write "loki" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

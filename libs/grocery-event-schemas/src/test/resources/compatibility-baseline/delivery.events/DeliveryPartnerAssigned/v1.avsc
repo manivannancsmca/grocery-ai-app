@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "DeliveryPartnerAssigned",
+  "namespace": "com.grocery.events.delivery",
+  "doc": "A partner accepted an offer (or an admin assigned one); the partner now owns the delivery. Producer: delivery-service, topic delivery.events, key orderId (outbox aggregate type Delivery).",
+  "fields": [
+    {"name": "deliveryId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery."},
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "partnerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the delivery partner (= the partner's user id)."},
+    {"name": "partnerName", "type": ["null", "string"], "default": null, "doc": "The partner's display name; null if not set."},
+    {"name": "vehicleType", "type": ["null", "string"], "default": null, "doc": "One of: BICYCLE, SCOOTER, MOTORCYCLE, CAR; null if not set."},
+    {"name": "manual", "type": "boolean", "doc": "True when an admin assigned the partner directly."},
+    {"name": "assignedAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the partner was assigned (UTC)."}
+  ]
+}

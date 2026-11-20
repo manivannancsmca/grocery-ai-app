@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "OrderCancelled",
+  "namespace": "com.grocery.events.order",
+  "doc": "The order was cancelled; the single compensation trigger (inventory releases the stock, payment cancels the payment or refunds it). Producer: order-service, topic order.events, key orderId.",
+  "fields": [
+    {"name": "orderId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the order (message key)."},
+    {"name": "orderNumber", "type": "string", "doc": "Human-readable order number."},
+    {"name": "orderType", "type": "string", "doc": "Store type of the order. One of: GROCERY, RESTAURANT."},
+    {"name": "customerId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Id of the customer."},
+    {"name": "storeId", "type": {"type": "string", "logicalType": "uuid"}, "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."},
+    {"name": "previousStatus", "type": "string", "doc": "Order status before the cancellation. One of: CREATED, AWAITING_PAYMENT, CONFIRMED (the enum also has REJECTED, CANCELLED)."},
+    {"name": "reason", "type": "string", "doc": "Cancellation reason. One of: CUSTOMER_CANCELLED, ADMIN_CANCELLED, PAYMENT_TIMEOUT, RESERVATION_EXPIRED."},
+    {"name": "cancelledBy", "type": "string", "doc": "Who cancelled. One of: CUSTOMER, ADMIN, SYSTEM."},
+    {"name": "actorUserId", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "User id of the cancelling customer or admin; null when the system cancelled."},
+    {"name": "note", "type": ["null", "string"], "default": null, "doc": "Free-text note (the customer's optional reason or the admin's reason); null if none."},
+    {"name": "cancelledAt", "type": {"type": "long", "logicalType": "timestamp-micros"}, "doc": "When the order was cancelled (UTC)."}
+  ]
+}

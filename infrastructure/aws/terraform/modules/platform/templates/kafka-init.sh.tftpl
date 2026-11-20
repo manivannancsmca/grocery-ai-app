@@ -1,0 +1,34 @@
+set -euo pipefail
+umask 077
+# kafka-init (rendered by modules/platform): the topics of infrastructure/local/kafka/create-topics.sh on MSK, with the
+# environment's replication factor, over SASL/SCRAM + TLS as the kafka-admin user. Idempotent (--if-not-exists).
+cat > /tmp/client.properties <<EOF
+security.protocol=SASL_SSL
+sasl.mechanism=SCRAM-SHA-512
+sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="$KAFKA_SASL_USERNAME" password="$KAFKA_SASL_PASSWORD";
+EOF
+KT=/opt/kafka/bin/kafka-topics.sh
+BOOTSTRAP="${bootstrap}"
+RF=${replication_factor}
+
+create() {   # create <topic> <partitions> [config=value ...]
+  local topic="$1" partitions="$2"; shift 2
+  local args=()
+  for c in "$@"; do args+=(--config "$c"); done
+  "$KT" --bootstrap-server "$BOOTSTRAP" --command-config /tmp/client.properties --create --if-not-exists \
+        --topic "$topic" --partitions "$partitions" --replication-factor "$RF" "$${args[@]}"
+}
+
+echo "Waiting for MSK at $BOOTSTRAP ..."
+until "$KT" --bootstrap-server "$BOOTSTRAP" --command-config /tmp/client.properties --list >/dev/null 2>&1; do sleep 5; done
+
+%{ for t in domain_topics ~}
+create ${t} ${partitions} retention.ms=${domain_retention_ms}
+create ${t}.DLT ${dlt_partitions} retention.ms=${dlt_retention_ms}
+%{ endfor ~}
+%{ for name, t in extra_topics ~}
+create ${name} ${t.partitions == 0 ? partitions : t.partitions} ${join(" ", [for k, v in t.config : "${k}=${v}"])}
+%{ endfor ~}
+
+echo "Topics:"
+"$KT" --bootstrap-server "$BOOTSTRAP" --command-config /tmp/client.properties --list

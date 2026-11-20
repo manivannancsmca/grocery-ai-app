@@ -1,0 +1,14 @@
+# Run from the IDE while the rest of the platform runs in Docker:
+#   1) docker compose stop identity-service      (in infrastructure/local)
+#   2) run IdentityServiceApplication with profile "local"
+# MySQL is published on host port 3307 by docker-compose.yml.
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.grocery: DEBUG
+
+grocery:
+  identity:
+    dev-accounts:
+      enabled: ${DEV_SEED_ENABLED:true}   # dev.*@grocery.local accounts, listed on the dev sign-in screen

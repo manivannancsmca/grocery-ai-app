@@ -1,0 +1,92 @@
+# =====================================================================================================================
+# Profile "aws" of delivery-service (contract Phase 14 §7): ECS Fargate, task definition grocery-<env>-delivery-service.
+# The task definition (Terraform modules/platform + services.auto.tfvars.json) sets SPRING_PROFILES_ACTIVE=aws, so
+# this file is applied ALONE on top of application.yml (not with the docker profile). It reads ONLY environment
+# variables: plain values from the task definition, secrets from Secrets Manager through the task's `secrets` -
+# no secret and no environment-specific value is written here.
+# Infrastructure endpoints have no default: a missing one stops the service at start-up instead of silently
+# connecting to localhost.
+#
+# Environment:
+#   DB_HOST, DB_PORT (3306)                       RDS for MySQL 8.4 (TLS required)
+#   DB_USERNAME, DB_PASSWORD                      secret grocery/<env>/delivery-service/db
+#   DB_SSL_MODE (REQUIRED)                        Connector/J sslMode; VERIFY_CA needs the RDS CA in a truststore
+#   REDIS_HOST, REDIS_PORT (6379)                 ElastiCache for Redis primary endpoint
+#   REDIS_TLS (true), REDIS_AUTH                  in-transit encryption; AUTH token (secret grocery/<env>/redis/auth-token)
+#   KAFKA_BOOTSTRAP_SERVERS                       MSK brokers, SASL/SCRAM listener (port 9096)
+#   KAFKA_SASL_USERNAME, KAFKA_SASL_PASSWORD      SCRAM-SHA-512 user (secret AmazonMSK_grocery/<env>/delivery-service/kafka)
+#   KAFKA_SECURITY_PROTOCOL (SASL_SSL), KAFKA_SASL_MECHANISM (SCRAM-SHA-512)   PLAINTEXT only for a local run
+#   JWT_ISSUER                                    https://<domain> (the issuer identity-service signs)
+#   IDENTITY_JWKS_URI                             identity JWKS through Service Connect
+#   SCHEMA_REGISTRY_URL / GROCERY_EVENTS_AVRO_SCHEMA_REGISTRY_URL   http://schema-registry:8081 (Service Connect)
+#   APPROVAL_JWKS_URI                             the orchestrator's approval JWKS (X-Approval-Token)
+#   OTEL_EXPORTER_OTLP_ENDPOINT (http://localhost:4318)   the ADOT sidecar of the task (traces -> X-Ray)
+#   TRACING_SAMPLING_PROBABILITY (0.1)            share of traces kept
+#   GROCERY_ENV                                   dev | staging | prod: the env tag of every metric and log line
+#   JAVA_TOOL_OPTIONS, TZ                         JVM sizing (MaxRAMPercentage), UTC
+#   DELIVERY_LOCATION_STALE_AFTER                 tunable (task definition, from services.auto.tfvars.json)
+#   DELIVERY_OFFER_BATCH_SIZE                     tunable (task definition, from services.auto.tfvars.json)
+#   DELIVERY_OFFER_TTL                            tunable (task definition, from services.auto.tfvars.json)
+#   DELIVERY_POLL_INTERVAL                        tunable (task definition, from services.auto.tfvars.json)
+#   DELIVERY_RETRY_INTERVAL                       tunable (task definition, from services.auto.tfvars.json)
+#   DELIVERY_SEARCH_RADII_KM                      tunable (task definition, from services.auto.tfvars.json)
+# Run it locally against the docker stack ("aws-like"): infrastructure/ci/README.md, "application-aws.yml".
+# =====================================================================================================================
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 25s     # graceful shutdown inside the ECS stopTimeout (30 s)
+  datasource:
+    # RDS requires TLS: sslMode=REQUIRED (the docker profile's useSSL=false does not apply here)
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/delivery_db?sslMode=${DB_SSL_MODE:REQUIRED}&connectionTimeZone=UTC
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_AUTH:}
+      ssl:
+        enabled: ${REDIS_TLS:true}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    security:
+      protocol: ${KAFKA_SECURITY_PROTOCOL:SASL_SSL}
+    properties:   # every client: producer, consumers, admin (dead-letter reader included)
+      sasl.mechanism: ${KAFKA_SASL_MECHANISM:SCRAM-SHA-512}
+      sasl.jaas.config: 'org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_SASL_USERNAME}" password="${KAFKA_SASL_PASSWORD}";'
+  security:
+    oauth2:
+      resourceserver:
+        jwt:   # zero trust: every service validates the JWT itself (identity JWKS, issuer, audience)
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://identity-service:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER}
+
+grocery:
+  events:
+    avro:
+      schema-registry-url: ${GROCERY_EVENTS_AVRO_SCHEMA_REGISTRY_URL:${SCHEMA_REGISTRY_URL:http://schema-registry:8081}}
+  approvals:
+    jwks-uri: ${APPROVAL_JWKS_URI:http://ai-orchestrator-service:8115/.well-known/approval-jwks.json}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus   # /actuator/prometheus is scraped by the ADOT sidecar (-> AMP)
+  endpoint:
+    health:
+      probes:
+        enabled: true   # /actuator/health/liveness (container check), /actuator/health/readiness (ALB, deploys)
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+
+logging:
+  structured:
+    format:
+      console: ecs   # JSON lines (traceId, spanId, correlationId, service) -> CloudWatch Logs (awslogs)

@@ -1,0 +1,226 @@
+{
+  "type": "record",
+  "name": "OrderCreated",
+  "namespace": "com.grocery.events.order",
+  "doc": "A new order was placed (status CREATED). Producer: order-service, topic order.events, key orderId. Consumers: inventory (reserves grocery orders), cart (empties the cart if unchanged since cartUpdatedAt).",
+  "fields": [
+    {
+      "name": "orderId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the order (message key)."
+    },
+    {
+      "name": "orderNumber",
+      "type": "string",
+      "doc": "Human-readable order number, GA- followed by 8 Crockford base32 characters."
+    },
+    {
+      "name": "orderType",
+      "type": "string",
+      "doc": "Store type of the order. One of: GROCERY, RESTAURANT."
+    },
+    {
+      "name": "customerId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Id of the ordering customer (= user id)."
+    },
+    {
+      "name": "storeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "vendorId for a GROCERY order, restaurantId for a RESTAURANT order."
+    },
+    {
+      "name": "storeName",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Store name at ordering time; null if unknown."
+    },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "OrderCreatedItem",
+          "doc": "One order line.",
+          "fields": [
+            {
+              "name": "itemId",
+              "type": {
+                "type": "string",
+                "logicalType": "uuid"
+              },
+              "doc": "productId (type PRODUCT) or menuItemId (type MENU_ITEM)."
+            },
+            {
+              "name": "type",
+              "type": "string",
+              "doc": "Line type. One of: PRODUCT, MENU_ITEM."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "doc": "Item name at ordering time."
+            },
+            {
+              "name": "quantity",
+              "type": "int",
+              "doc": "Ordered quantity (> 0)."
+            },
+            {
+              "name": "unitPrice",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              },
+              "doc": "Unit price in the order currency, 2 decimals."
+            },
+            {
+              "name": "lineTotal",
+              "type": {
+                "type": "bytes",
+                "logicalType": "decimal",
+                "precision": 12,
+                "scale": 2
+              },
+              "doc": "Line total in the order currency, 2 decimals."
+            }
+          ]
+        }
+      },
+      "doc": "The order lines (at least one)."
+    },
+    {
+      "name": "subtotal",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Sum of the line totals, 2 decimals."
+    },
+    {
+      "name": "deliveryFee",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Delivery fee, 2 decimals."
+    },
+    {
+      "name": "total",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 12,
+        "scale": 2
+      },
+      "doc": "Amount payable, 2 decimals."
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "doc": "ISO 4217 currency code, always INR today."
+    },
+    {
+      "name": "cartUpdatedAt",
+      "type": [
+        "null",
+        {
+          "type": "long",
+          "logicalType": "timestamp-micros"
+        }
+      ],
+      "default": null,
+      "doc": "updatedAt of the cart version the order was placed from (UTC); null if the preview had none. cart-service compares it at millisecond precision."
+    },
+    {
+      "name": "paymentDueAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "End of the payment window (UTC)."
+    },
+    {
+      "name": "createdAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      },
+      "doc": "When the order was created (UTC)."
+    },
+    {
+      "name": "couponCode",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Coupon applied to the order (Phase 12); null when none."
+    },
+    {
+      "name": "discount",
+      "type": [
+        "null",
+        {
+          "type": "bytes",
+          "logicalType": "decimal",
+          "precision": 12,
+          "scale": 2
+        }
+      ],
+      "default": null,
+      "doc": "Discount on the items from the coupon, 2 decimals (Phase 12); null when none."
+    },
+    {
+      "name": "deliveryFeeDiscount",
+      "type": [
+        "null",
+        {
+          "type": "bytes",
+          "logicalType": "decimal",
+          "precision": 12,
+          "scale": 2
+        }
+      ],
+      "default": null,
+      "doc": "Discount on the delivery fee (FREE_DELIVERY coupons), 2 decimals (Phase 12); null when none."
+    },
+    {
+      "name": "couponName",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Name of the coupon at ordering time, e.g. 'Welcome offer'; null when none, and in orders placed before 1.7.0."
+    },
+    {
+      "name": "couponFundedBy",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Who funds the coupon's discounts: the coupon's scope at ordering time (1.7.0). One of: PLATFORM, STORE; null when none, and in orders placed before 1.7.0."
+    }
+  ]
+}

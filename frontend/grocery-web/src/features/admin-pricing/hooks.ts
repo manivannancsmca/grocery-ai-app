@@ -1,0 +1,32 @@
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type AdminPriceRequestListParams, adminPriceKeys, approvePriceRequest, listAdminPriceRequests, rejectPriceRequest } from './api'
+
+export function useAdminPriceRequests(params: AdminPriceRequestListParams) {
+  return useQuery({
+    queryKey: adminPriceKeys.list(params),
+    queryFn: () => listAdminPriceRequests(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Number of price changes waiting for a decision (one-row page; only `totalElements` is used). */
+export function usePendingPriceRequestCount() {
+  const params: AdminPriceRequestListParams = { status: 'PENDING', page: 0, size: 1 }
+  return useQuery({
+    queryKey: adminPriceKeys.list(params),
+    queryFn: () => listAdminPriceRequests(params),
+    select: (page) => page.totalElements,
+  })
+}
+
+type Decision = { action: 'approve'; id: string; note: string | null } | { action: 'reject'; id: string; reason: string }
+
+/** Approve or reject; every list (and the pending count) is refreshed afterwards, also after a 409. */
+export function usePriceDecision() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (decision: Decision) =>
+      decision.action === 'approve' ? approvePriceRequest(decision.id, decision.note) : rejectPriceRequest(decision.id, decision.reason),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: adminPriceKeys.all }),
+  })
+}

@@ -1,0 +1,1247 @@
+# =====================================================================================
+# Grocery platform — local development. EVERYTHING runs in Docker (no Windows services).
+#
+#   cd infrastructure/local
+#   docker compose up -d                                   # core infrastructure only
+#   docker compose --profile core --profile frontend up -d --build   # gateway + Phase 2 services + React
+#   docker compose --profile core --profile catalog --profile frontend up -d --build
+#                                                          # + Phase 3 catalog & search (Elasticsearch)
+#   docker compose --profile core --profile catalog --profile inventory --profile frontend up -d --build
+#                                                          # + Phase 4 inventory & pricing
+#   docker compose --profile core --profile catalog --profile inventory --profile cart --profile frontend up -d --build
+#                                                          # + Phase 5 cart & checkout preview
+#   docker compose --profile core --profile catalog --profile inventory --profile cart --profile orders \
+#                  --profile frontend up -d --build        # + Phase 6 orders & payments (Razorpay test mode / simulator)
+#   docker compose --profile ai up -d                      # + Ollama (pulls the dev model) and ai-orchestrator-service
+#   AI_PROVIDER=scripted docker compose --profile assistant up -d --build
+#                                                          # Phase 11 assistants without a model (deterministic stand-in)
+#   docker compose --profile all up -d --build             # everything that exists so far
+#   Phase 12: --profile reviews (review-service), --profile reporting (reporting-service); "realtime" also starts
+#   Mailpit (emails at http://localhost:8025). mysql-init re-applies mysql/init/*.sql on every "up" (new databases
+#   such as reporting_db appear on an existing volume too).
+#   Phase 13: --profile observability (Prometheus, Alertmanager, Grafana http://localhost:3000, Loki, Alloy, Tempo,
+#   OpenTelemetry Collector, exporters; ≤ 1.5 GB) next to the app profiles — see observability/README.md.
+#
+# Profiles keep memory low: start only what the current phase needs.
+# Services are added to this file phase by phase (see DEVELOPMENT_PLAN.md §13).
+# Optional NVIDIA GPU for Ollama: add  -f docker-compose.gpu.yml
+# =====================================================================================
+name: grocery
+
+x-java-env: &java-env
+  SPRING_PROFILES_ACTIVE: docker
+  # Small, container-aware JVM footprint for development.
+  JAVA_TOOL_OPTIONS: >-
+    -XX:MaxRAMPercentage=75 -XX:+UseSerialGC -XX:TieredStopAtLevel=1
+    -Xss512k -XX:ReservedCodeCacheSize=64m
+  TZ: UTC
+  # Avro event payloads: grocery-common encodes/decodes against the Schema Registry (grocery.events.avro.*).
+  GROCERY_EVENTS_AVRO_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+  # Phase 10 housekeeping (grocery-common): outbox rows are deleted after this long
+  GROCERY_OUTBOX_CLEANUP_RETENTION: ${OUTBOX_RETENTION:-7d}
+  GROCERY_OUTBOX_CLEANUP_INTERVAL: ${OUTBOX_CLEANUP_INTERVAL:-1h}
+  GROCERY_HOUSEKEEPING_INITIALDELAY: ${HOUSEKEEPING_INITIAL_DELAY:-30m}   # first cleanup run after startup
+  # Phase 13 observability (grocery-common 0.9.0; the gateway reads the same three). Traces go over OTLP/HTTP to the
+  # collector of the "observability" profile; without it the export fails silently in the background and nothing
+  # else is affected. GROCERY_ENV is the "env" tag of every metric and the environment of logs and traces.
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+  GROCERY_ENV: ${GROCERY_ENV:-local}
+  TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
+
+x-java-service: &java-service
+  restart: unless-stopped
+  mem_limit: 384m
+
+services:
+  # ------------------------------------------------------------------ infrastructure
+  mysql:
+    image: mysql:8.4.13
+    restart: unless-stopped
+    mem_limit: 768m
+    # Settings passed as flags (a my.cnf bind-mounted from Windows is world-writable
+    # and MySQL silently ignores it). One container hosts every service database.
+    command:
+      - --server-id=1
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --binlog-expire-logs-seconds=259200
+      - --innodb-buffer-pool-size=256M
+      - --innodb-log-buffer-size=16M
+      - --performance-schema=OFF
+      - --max-connections=300
+      - --table-open-cache=400
+      - --skip-name-resolve
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      TZ: UTC
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MYSQL_HOST_PORT:-3307}:3306"     # 3307 on the host: a Windows MySQL may own 3306
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # MySQL runs /docker-entrypoint-initdb.d only when the volume is empty. This one-shot applies the same idempotent
+  # scripts (CREATE ... IF NOT EXISTS, GRANT) on every start, so a database or user added later (Phase 12:
+  # reporting_db / reporting_user) exists on an existing volume too. No profile: it always runs after mysql is healthy;
+  # a service whose database was added later waits for it with condition service_completed_successfully.
+  mysql-init:
+    image: mysql:8.4.13
+    restart: "no"
+    mem_limit: 128m
+    depends_on:
+      mysql: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        shopt -s nullglob
+        printf '[client]\nhost=mysql\nuser=root\npassword=%s\n' "$$MYSQL_ROOT_PASSWORD" > /tmp/root.cnf
+        for file in /init/*.sql; do
+          echo "Applying $$file"
+          mysql --defaults-extra-file=/tmp/root.cnf < "$$file"
+        done
+        echo "MySQL init scripts applied"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    volumes:
+      - ./mysql/init:/init:ro
+
+  # Daily export of every service database into BACKUP_DIR (one consistent grocery-<date>_<time>-daily.sql.gz),
+  # at BACKUP_TIME local time or, when the machine was off then, as soon as Docker runs again that day. Daily
+  # exports older than BACKUP_KEEP_DAYS are deleted. Export now: host-run\db-backup.cmd. Import:
+  # host-run\db-restore.cmd (README "Database backups"). No profile: it runs whenever MySQL runs.
+  db-backup:
+    image: mysql:8.4.13                 # the server's own mysqldump/mysql version
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      mysql: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "/scripts/schedule.sh"]
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      TZ: ${BACKUP_TIMEZONE:-Asia/Kolkata}
+      BACKUP_TIME: ${BACKUP_TIME:-00:00}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./db-backup:/scripts:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+
+  kafka:
+    image: apache/kafka:4.3.2
+    restart: unless-stopped
+    mem_limit: 768m
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-MkU3OEVBNTcwNTJENDM2Qk}
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:${KAFKA_HOST_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # topics are declared explicitly
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${KAFKA_HOST_PORT:-9092}:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  kafka-init:                       # one-shot: creates domain topics, then exits
+    image: apache/kafka:4.3.2
+    restart: "no"
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "/scripts/create-topics.sh"]
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+    volumes:
+      - ./kafka/create-topics.sh:/scripts/create-topics.sh:ro
+
+  kafka-connect:                    # Debezium = the outbox relay for every service
+    image: quay.io/debezium/connect:3.7.1.Final
+    restart: unless-stopped
+    mem_limit: 768m
+    depends_on:
+      kafka: { condition: service_healthy }
+      mysql: { condition: service_healthy }
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: grocery-connect
+      CONFIG_STORAGE_TOPIC: _connect_configs
+      OFFSET_STORAGE_TOPIC: _connect_offsets
+      STATUS_STORAGE_TOPIC: _connect_status
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      # Connector JSON files reference ${env:DEBEZIUM_DB_PASSWORD} instead of a literal secret.
+      CONNECT_CONFIG_PROVIDERS: env
+      CONNECT_CONFIG_PROVIDERS_ENV_CLASS: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+      DEBEZIUM_DB_PASSWORD: ${DEBEZIUM_DB_PASSWORD:-debezium_pass}
+      HEAP_OPTS: -Xms256m -Xmx512m
+      # Phase 13: remote JMX (Debezium image switch) for the "observability" profile's kafka-connect-jmx-exporter
+      # (connector/task state, Debezium MilliSecondsBehindSource). Internal network only: the port is not published.
+      JMXHOST: kafka-connect
+      JMXPORT: 9012
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${CONNECT_HOST_PORT:-8083}:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8083/connectors >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+  connect-init:                     # one-shot: registers services/*/deploy/debezium-connector.json
+    image: quay.io/debezium/connect:3.7.1.Final
+    restart: "no"
+    depends_on:
+      kafka-connect: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    entrypoint: ["/bin/bash", "/scripts/register-connectors.sh"]
+    environment:
+      CONNECT_URL: http://kafka-connect:8083
+      SERVICES_DIR: /services
+    volumes:
+      - ./debezium/register-connectors.sh:/scripts/register-connectors.sh:ro
+      - ../../services:/services:ro
+
+  connect-watchdog:                 # Phase 10: restarts FAILED Debezium tasks (a RUNNING connector can hide a FAILED task)
+    image: quay.io/debezium/connect:3.7.1.Final
+    restart: unless-stopped
+    mem_limit: 64m
+    depends_on:
+      kafka-connect: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "/scripts/connect-watchdog.sh"]
+    environment:
+      CONNECT_URL: http://kafka-connect:8083
+      CHECK_INTERVAL: ${CONNECT_WATCHDOG_INTERVAL:-30}
+      MAX_RESTARTS: 3
+      RESTART_WINDOW: 600
+    volumes:
+      - ./debezium/connect-watchdog.sh:/scripts/connect-watchdog.sh:ro
+
+  schema-registry:                  # Confluent Schema Registry: central Avro schemas, compatibility enforced on register
+    image: confluentinc/cp-schema-registry:8.2.4
+    restart: unless-stopped
+    mem_limit: 512m
+    depends_on:
+      kafka: { condition: service_healthy }
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas                 # schemas are stored in a compacted Kafka topic
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1     # production: 3
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: backward_transitive
+      SCHEMA_REGISTRY_HEAP_OPTS: -Xms128m -Xmx320m
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${SCHEMA_REGISTRY_HOST_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  schema-init:                      # one-shot: registers libs/grocery-event-schemas (compatibility-checked first)
+    image: quay.io/debezium/connect:3.7.1.Final
+    restart: "no"
+    depends_on:
+      schema-registry: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "/scripts/register-schemas.sh"]
+    environment:
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      SCHEMAS_DIR: /schemas
+      SCHEMA_COMPATIBILITY: BACKWARD_TRANSITIVE
+    volumes:
+      - ./schema-registry/register-schemas.sh:/scripts/register-schemas.sh:ro
+      - ../../libs/grocery-event-schemas/src/main/avro:/schemas:ro
+
+  redis:
+    image: redis:8.8.4-alpine
+    restart: unless-stopped
+    mem_limit: 256m
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "200mb", "--maxmemory-policy", "volatile-lru"]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  kafka-ui:                         # developer tool: topics, messages, DLTs, consumer lag, connectors
+    image: kafbat/kafka-ui:v1.5.0
+    restart: unless-stopped
+    mem_limit: 384m
+    depends_on:
+      kafka: { condition: service_healthy }
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081   # shows Avro messages decoded
+      JAVA_OPTS: -Xmx256m
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${KAFKA_UI_HOST_PORT:-8070}:8080"
+
+  elasticsearch:                    # needed from Phase 3 (catalog search)
+    image: elasticsearch:9.4.6
+    profiles: ["search", "catalog", "all"]
+    restart: unless-stopped
+    mem_limit: 1g
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"          # local only — production keeps security on
+      cluster.routing.allocation.disk.threshold_enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ES_HOST_PORT:-9200}:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  # ------------------------------------------------------------------ AI (Phase 11)
+  ollama:
+    image: ollama/ollama:0.40.15
+    profiles: ["ai", "all"]
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-1h}   # keep the model loaded between chats (loading it again on CPU takes minutes)
+      # The AI service asks for an 8192-token window (AI_OLLAMA_CONTEXT_TOKENS); its KV cache is 1.1 GB for qwen3:4b
+      # (the container ~4.1 GB). Measured on this CPU (2026-11-19, 1,950-token prompt): flash attention with an f16
+      # cache read 46 tokens/s, without flash attention 39, with an 8-bit cache (q8_0, half the memory) only 30.
+      OLLAMA_FLASH_ATTENTION: ${OLLAMA_FLASH_ATTENTION:-1}
+      OLLAMA_KV_CACHE_TYPE: ${OLLAMA_KV_CACHE_TYPE:-f16}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${OLLAMA_HOST_PORT:-11434}:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  ollama-init:                      # one-shot: pulls OLLAMA_MODEL into the volume
+    image: ollama/ollama:0.40.15
+    profiles: ["ai", "all"]
+    restart: "no"
+    depends_on:
+      ollama: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "/scripts/pull-model.sh"]
+    environment:
+      OLLAMA_HOST: ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b-instruct}
+    volumes:
+      - ./ollama/pull-model.sh:/scripts/pull-model.sh:ro
+
+  # ------------------------------------------------------------------ voice chat (speech to text, text to speech)
+  # An OpenAI-compatible audio API for the assistants' voice (AI_VOICE_MODE=server): faster-whisper turns spoken
+  # questions into text, Kokoro reads answers aloud, both on CPU. Without this profile the web app uses the browser's
+  # own speech features (AI_VOICE_MODE=browser). The models download once into the speaches-models volume.
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:0.8.3-cpu
+    profiles: ["voice", "all"]
+    restart: unless-stopped
+    environment:
+      WHISPER__COMPUTE_TYPE: int8   # smaller and faster on CPU
+      WHISPER__TTL: "-1"            # keep the models loaded (speech-to-text and text-to-speech): a cold load on CPU takes ~30 s
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${SPEACHES_HOST_PORT:-8000}:8000"
+    volumes:
+      - speaches-models:/home/ubuntu/.cache/huggingface/hub
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  speaches-init:                    # one-shot: downloads the speech-to-text and text-to-speech models
+    image: curlimages/curl:8.11.1
+    profiles: ["voice", "all"]
+    restart: "no"
+    depends_on:
+      speaches: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "/scripts/pull-models.sh"]
+    environment:
+      SPEACHES_URL: http://speaches:8000
+      TRANSCRIPTION_MODEL: ${AI_VOICE_TRANSCRIPTION_MODEL:-Systran/faster-whisper-small}
+      SPEECH_MODEL: ${AI_VOICE_SPEECH_MODEL:-speaches-ai/Kokoro-82M-v1.0-ONNX}
+      SPEECH_VOICE: ${AI_VOICE_SPEECH_VOICE:-af_heart}
+    volumes:
+      - ./speaches/pull-models.sh:/scripts/pull-models.sh:ro
+
+  # ------------------------------------------------------------------ edge
+  api-gateway:
+    <<: *java-service
+    profiles: ["core", "all"]
+    build:
+      context: ../..
+      dockerfile: services/api-gateway/Dockerfile
+    image: grocery/api-gateway:dev
+    depends_on:
+      redis: { condition: service_healthy }
+    environment:
+      <<: *java-env
+      GATEWAY_ALLOWED_ORIGINS: ${GATEWAY_ALLOWED_ORIGINS:-http://localhost:6420}
+      IDENTITY_SERVICE_URL: http://identity-service:8101
+      CUSTOMER_SERVICE_URL: http://customer-service:8102
+      VENDOR_SERVICE_URL: http://vendor-service:8103
+      RESTAURANT_SERVICE_URL: http://restaurant-service:8104
+      CATALOG_COMMAND_SERVICE_URL: http://catalog-command-service:8105
+      CATALOG_QUERY_SERVICE_URL: http://catalog-query-service:8106
+      INVENTORY_SERVICE_URL: http://inventory-service:8107
+      PRICING_SERVICE_URL: http://pricing-service:8108
+      CART_SERVICE_URL: http://cart-service:8109
+      ORDER_SERVICE_URL: http://order-service:8110
+      PAYMENT_SERVICE_URL: http://payment-service:8111
+      NOTIFICATION_SERVICE_URL: http://notification-service:8113
+      KAFKA_CONNECT_URL: http://kafka-connect:8083               # Phase 10: admin connector status / restart routes
+      DELIVERY_SERVICE_URL: http://delivery-service:8112
+      AI_ORCHESTRATOR_SERVICE_URL: http://ai-orchestrator-service:8115   # Phase 11: assistants and approvals
+      REVIEW_SERVICE_URL: http://review-service:8114             # Phase 12: reviews & ratings
+      REPORTING_SERVICE_URL: http://reporting-service:8116       # Phase 12: admin reports
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${GATEWAY_HOST_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9080/actuator/health | grep -q UP"]   # management port
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  # ------------------------------------------------------------------ business services (profile "core" = Phase 2)
+  identity-service:
+    <<: *java-service
+    profiles: ["core", "all"]
+    build:
+      context: ../..
+      dockerfile: services/identity-service/Dockerfile
+    image: grocery/identity-service:dev
+    depends_on:
+      mysql: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      schema-init: { condition: service_completed_successfully }   # Avro schemas registered before any event flows
+      redis: { condition: service_healthy }
+    environment:
+      <<: *java-env
+      DB_USERNAME: identity_user
+      DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_pass}
+      # First SUPER_ADMIN, created only when none exists. Local default — change for shared environments.
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@grocery.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Admin@12345}
+      # Development accounts dev.*@grocery.local (one per stakeholder, password Dev@12345), listed on the
+      # sign-in screen of the dev frontend. Local only: set DEV_SEED_ENABLED=false to start without them.
+      DEV_SEED_ENABLED: ${DEV_SEED_ENABLED:-true}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8101:8101"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8101/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  customer-service:
+    <<: *java-service
+    profiles: ["core", "all"]
+    build:
+      context: ../..
+      dockerfile: services/customer-service/Dockerfile
+    image: grocery/customer-service:dev
+    depends_on: &db-and-kafka
+      mysql: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      schema-init: { condition: service_completed_successfully }   # Avro schemas registered before any event flows
+    environment:
+      <<: *java-env
+      DB_USERNAME: customer_user
+      DB_PASSWORD: ${CUSTOMER_DB_PASSWORD:-customer_pass}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8102:8102"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8102/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  vendor-service:
+    <<: *java-service
+    profiles: ["core", "all"]
+    build:
+      context: ../..
+      dockerfile: services/vendor-service/Dockerfile
+    image: grocery/vendor-service:dev
+    depends_on: *db-and-kafka
+    environment:
+      <<: *java-env
+      DB_USERNAME: vendor_user
+      DB_PASSWORD: ${VENDOR_DB_PASSWORD:-vendor_pass}
+      ACCEPTANCE_TIMEOUT: ${ACCEPTANCE_TIMEOUT:-5m}              # Phase 8: a store must accept a paid order within this
+      ACCEPTANCE_POLL_INTERVAL: ${ACCEPTANCE_POLL_INTERVAL:-15s}  # auto-reject poller
+      APPROVAL_JWKS_URI: http://ai-orchestrator-service:8115/.well-known/approval-jwks.json   # Phase 11: X-Approval-Token keys
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8103:8103"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8103/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  restaurant-service:
+    <<: *java-service
+    profiles: ["core", "all"]
+    build:
+      context: ../..
+      dockerfile: services/restaurant-service/Dockerfile
+    image: grocery/restaurant-service:dev
+    depends_on: *db-and-kafka
+    environment:
+      <<: *java-env
+      DB_USERNAME: restaurant_user
+      DB_PASSWORD: ${RESTAURANT_DB_PASSWORD:-restaurant_pass}
+      ACCEPTANCE_TIMEOUT: ${ACCEPTANCE_TIMEOUT:-5m}              # Phase 8: a store must accept a paid order within this
+      ACCEPTANCE_POLL_INTERVAL: ${ACCEPTANCE_POLL_INTERVAL:-15s}  # auto-reject poller
+      APPROVAL_JWKS_URI: http://ai-orchestrator-service:8115/.well-known/approval-jwks.json   # Phase 11: X-Approval-Token keys
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8104:8104"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8104/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  delivery-service:
+    <<: *java-service
+    profiles: ["core", "all"]
+    build:
+      context: ../..
+      dockerfile: services/delivery-service/Dockerfile
+    image: grocery/delivery-service:dev
+    depends_on:
+      mysql: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      redis: { condition: service_healthy }                       # Phase 9: online partners (GEO) and live locations
+      schema-init: { condition: service_completed_successfully }
+    environment:
+      <<: *java-env
+      DB_USERNAME: delivery_user
+      DB_PASSWORD: ${DELIVERY_DB_PASSWORD:-delivery_pass}
+      DELIVERY_OFFER_TTL: ${DELIVERY_OFFER_TTL:-30s}              # a partner must accept an offer within this
+      DELIVERY_OFFER_BATCH_SIZE: ${DELIVERY_OFFER_BATCH_SIZE:-2}  # nearest partners offered at once; first accept wins
+      DELIVERY_SEARCH_RADII_KM: ${DELIVERY_SEARCH_RADII_KM:-3,6,10}
+      DELIVERY_POLL_INTERVAL: ${DELIVERY_POLL_INTERVAL:-5s}
+      DELIVERY_RETRY_INTERVAL: ${DELIVERY_RETRY_INTERVAL:-60s}
+      DELIVERY_LOCATION_STALE_AFTER: ${DELIVERY_LOCATION_STALE_AFTER:-60s}
+      APPROVAL_JWKS_URI: http://ai-orchestrator-service:8115/.well-known/approval-jwks.json   # Phase 12: X-Approval-Token keys
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8112:8112"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8112/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ------------------------------------------------------------------ catalog & search (profile "catalog" = Phase 3)
+  catalog-command-service:          # categories, brands, vendor products → catalog.events (outbox)
+    <<: *java-service
+    profiles: ["catalog", "all"]
+    build:
+      context: ../..
+      dockerfile: services/catalog-command-service/Dockerfile
+    image: grocery/catalog-command-service:dev
+    depends_on: *db-and-kafka
+    environment:
+      <<: *java-env
+      DB_USERNAME: catalog_user
+      DB_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog_pass}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8105:8105"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8105/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  catalog-query-service:            # Elasticsearch read side: search, suggestions, product & restaurant pages
+    <<: *java-service
+    profiles: ["catalog", "all"]
+    build:
+      context: ../..
+      dockerfile: services/catalog-query-service/Dockerfile
+    image: grocery/catalog-query-service:dev
+    depends_on:
+      kafka: { condition: service_healthy }
+      schema-init: { condition: service_completed_successfully }   # Avro schemas registered before any event flows
+      elasticsearch: { condition: service_healthy }
+    environment:
+      <<: *java-env
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8106:8106"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8106/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ------------------------------------------------------------------ inventory & pricing (profile "inventory" = Phase 4)
+  inventory-service:                # stock per product, movement ledger, reservations → inventory.events (outbox)
+    <<: *java-service
+    profiles: ["inventory", "all"]
+    build:
+      context: ../..
+      dockerfile: services/inventory-service/Dockerfile
+    image: grocery/inventory-service:dev
+    depends_on: *db-and-kafka
+    environment:
+      <<: *java-env
+      DB_USERNAME: inventory_user
+      DB_PASSWORD: ${INVENTORY_DB_PASSWORD:-inventory_pass}
+      RESERVATION_TTL: ${RESERVATION_TTL:-20m}                  # Phase 6: stock held for an unpaid grocery order
+      APPROVAL_JWKS_URI: http://ai-orchestrator-service:8115/.well-known/approval-jwks.json   # Phase 12: X-Approval-Token keys
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8107:8107"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8107/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  pricing-service:                  # live prices, price-change approval, cached quote → pricing.events (outbox)
+    <<: *java-service
+    profiles: ["inventory", "all"]
+    build:
+      context: ../..
+      dockerfile: services/pricing-service/Dockerfile
+    image: grocery/pricing-service:dev
+    depends_on:
+      mysql: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      schema-init: { condition: service_completed_successfully }   # Avro schemas registered before any event flows
+      redis: { condition: service_healthy }
+    environment:
+      <<: *java-env
+      DB_USERNAME: pricing_user
+      DB_PASSWORD: ${PRICING_DB_PASSWORD:-pricing_pass}
+      PRICING_APPROVAL_THRESHOLD_PERCENT: ${PRICING_APPROVAL_THRESHOLD_PERCENT:-20}
+      COUPON_RESERVATION_TTL: ${COUPON_RESERVATION_TTL:-30m}    # Phase 12: a RESERVED redemption without OrderCreated is released
+      APPROVAL_JWKS_URI: http://ai-orchestrator-service:8115/.well-known/approval-jwks.json   # Phase 12: X-Approval-Token keys
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8108:8108"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8108/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ------------------------------------------------------------------ cart & checkout preview (profile "cart" = Phase 5)
+  cart-service:                     # one cart per customer in Redis; live prices/stock from the owning services
+    <<: *java-service
+    profiles: ["cart", "all"]
+    build:
+      context: ../..
+      dockerfile: services/cart-service/Dockerfile
+    image: grocery/cart-service:dev
+    depends_on:
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }     # Phase 6: OrderCreated empties the cart
+      schema-init: { condition: service_completed_successfully }   # Avro schemas registered before any event flows
+    environment:
+      <<: *java-env
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8109:8109"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8109/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ------------------------------------------------------------------ orders & payments (profile "orders" = Phase 6)
+  order-service:                    # orders (price snapshot), status owner, idempotent creation → order.events (outbox)
+    <<: *java-service
+    profiles: ["orders", "all"]
+    build:
+      context: ../..
+      dockerfile: services/order-service/Dockerfile
+    image: grocery/order-service:dev
+    depends_on: *db-and-kafka
+    environment:
+      <<: *java-env
+      DB_USERNAME: order_user
+      DB_PASSWORD: ${ORDER_DB_PASSWORD:-order_pass}
+      CART_SERVICE_URL: http://cart-service:8109
+      ORDER_PAYMENT_WINDOW: ${ORDER_PAYMENT_WINDOW:-15m}        # e.g. 45s to test the payment timeout quickly
+      ORDER_WATCHDOG_INTERVAL: ${ORDER_WATCHDOG_INTERVAL:-1m}    # Phase 10: stuck-order watchdog
+      ORDER_STUCK_CREATED_AFTER: ${ORDER_STUCK_CREATED_AFTER:-2m}
+      ORDER_STUCK_PAYMENT_GRACE: ${ORDER_STUCK_PAYMENT_GRACE:-2m}
+      ORDER_STUCK_CONFIRMED_AFTER: ${ORDER_STUCK_CONFIRMED_AFTER:-15m}
+      ORDER_STUCK_PREPARATION_GRACE: ${ORDER_STUCK_PREPARATION_GRACE:-30m}
+      ORDER_STUCK_PICKUP_AFTER: ${ORDER_STUCK_PICKUP_AFTER:-30m}
+      ORDER_STUCK_DELIVERY_AFTER: ${ORDER_STUCK_DELIVERY_AFTER:-90m}
+      APPROVAL_JWKS_URI: http://ai-orchestrator-service:8115/.well-known/approval-jwks.json   # Phase 11: X-Approval-Token keys
+      ORDER_RETURN_WINDOW: ${ORDER_RETURN_WINDOW:-48h}          # Phase 12: a return may be requested this long after delivery
+      RETURN_DECISION_TIMEOUT: ${RETURN_DECISION_TIMEOUT:-24h}  # the store decides within this, else ESCALATED to admins
+      RETURN_ESCALATION_INTERVAL: ${RETURN_ESCALATION_INTERVAL:-1m}   # escalation poller
+      ORDER_COMPLAINTS_MAX_OPEN: ${ORDER_COMPLAINTS_MAX_OPEN:-5}      # open complaints per customer
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8110:8110"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8110/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  payment-service:                  # Razorpay orders, verify, webhooks, refunds, payment window → payment.events (outbox)
+    <<: *java-service
+    profiles: ["orders", "all"]
+    build:
+      context: ../..
+      dockerfile: services/payment-service/Dockerfile
+    image: grocery/payment-service:dev
+    depends_on: *db-and-kafka
+    environment:
+      <<: *java-env
+      DB_USERNAME: payment_user
+      DB_PASSWORD: ${PAYMENT_DB_PASSWORD:-payment_pass}
+      # Razorpay TEST keys from .env. Empty → simulator mode (local only; see docs/api/phase-6-orders-and-payments.md §3.3)
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      GROCERY_PAYMENT_EXPIRY_POLL_INTERVAL: ${PAYMENT_EXPIRY_POLL_INTERVAL:-30s}
+      PAYMENT_RECONCILE_INTERVAL: ${PAYMENT_RECONCILE_INTERVAL:-2m}   # Phase 10: recovers lost verify calls / webhooks
+      PAYMENT_RECONCILE_AFTER: ${PAYMENT_RECONCILE_AFTER:-2m}
+      APPROVAL_JWKS_URI: http://ai-orchestrator-service:8115/.well-known/approval-jwks.json   # Phase 11: X-Approval-Token keys
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8111:8111"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8111/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ------------------------------------------------------------------ real-time (profile "realtime" = Phase 7)
+  notification-service:             # inbox + Server-Sent Events; fan-out to every replica through Redis pub/sub
+    <<: *java-service
+    profiles: ["realtime", "realtime-ha", "all"]
+    build:
+      context: ../..
+      dockerfile: services/notification-service/Dockerfile
+    image: grocery/notification-service:dev
+    depends_on: &notification-deps
+      mysql: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      schema-init: { condition: service_completed_successfully }   # Avro schemas registered before any event flows
+    environment: &notification-env
+      <<: *java-env
+      DB_USERNAME: notification_user
+      DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_pass}
+      # Phase 12 email: sent through Mailpit locally (production: a real SMTP / provider via SPRING_MAIL_*). No
+      # depends_on: email is optional, the in-app notification never waits for SMTP (the email outbox retries).
+      GROCERY_MAIL_ENABLED: ${MAIL_ENABLED:-true}
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:6420}       # absolute links in emails
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8113:8113"
+    healthcheck: &notification-health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8113/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  notification-service-2:           # second replica (multi-replica check): same image, DB, Redis and consumer group
+    <<: *java-service
+    profiles: ["realtime-ha", "all"]
+    image: grocery/notification-service:dev
+    depends_on:
+      <<: *notification-deps
+      notification-service: { condition: service_started }        # same image; built by the first replica
+    environment:
+      <<: *notification-env
+      GROCERY_NOTIFICATION_INSTANCE_ID: notification-service-2
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8123:8113"                 # direct only (the gateway routes to the first replica; production uses a load balancer)
+    healthcheck: *notification-health
+
+  mailpit:                          # Phase 12: local SMTP catcher (mailpit:1025 inside the network); web UI on the host
+    image: axllent/mailpit:v1.32.0
+    profiles: ["realtime", "realtime-ha", "observability", "all"]   # Phase 13: Alertmanager emails land here too
+    restart: unless-stopped
+    mem_limit: 64m
+    environment:
+      MP_MAX_MESSAGES: 500          # oldest messages are deleted beyond this
+      TZ: UTC
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MAILPIT_UI_PORT:-8025}:8025"   # web UI
+      # SMTP on localhost only, for a notification-service that runs on the host (host-run/start-all.cmd);
+      # the containers keep using mailpit:1025 inside the network.
+      - "${BIND_ADDRESS:-127.0.0.1}:${MAILPIT_SMTP_PORT:-1025}:1025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ------------------------------------------------------------------ reviews & reporting (Phase 12)
+  review-service:                   # reviews, moderation, store replies, rating summaries → review.events (outbox)
+    <<: *java-service
+    profiles: ["reviews", "all"]
+    build:
+      context: ../..
+      dockerfile: services/review-service/Dockerfile
+    image: grocery/review-service:dev
+    depends_on: *db-and-kafka
+    environment:
+      <<: *java-env
+      DB_USERNAME: review_user
+      DB_PASSWORD: ${REVIEW_DB_PASSWORD:-review_pass}
+      REVIEW_WINDOW: ${REVIEW_WINDOW:-30d}                      # a delivered order can be reviewed this long
+      REVIEW_EDIT_WINDOW: ${REVIEW_EDIT_WINDOW:-7d}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8114:8114"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8114/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  reporting-service:                # read model built only from events; admin reports and CSV exports
+    <<: *java-service
+    profiles: ["reporting", "all"]
+    build:
+      context: ../..
+      dockerfile: services/reporting-service/Dockerfile
+    image: grocery/reporting-service:dev
+    depends_on:
+      mysql: { condition: service_healthy }
+      mysql-init: { condition: service_completed_successfully }   # reporting_db / reporting_user on existing volumes
+      kafka: { condition: service_healthy }
+      schema-init: { condition: service_completed_successfully }   # Avro schemas registered before any event flows
+    environment:
+      <<: *java-env
+      DB_USERNAME: reporting_user
+      DB_PASSWORD: ${REPORTING_DB_PASSWORD:-reporting_pass}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8116:8116"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8116/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ------------------------------------------------------------------ AI assistants & human approval (Phase 11)
+  # Profile "assistant" = the orchestrator only (AI_PROVIDER=scripted needs no model); "ai" = plus Ollama and the model
+  # pull. The orchestrator never waits for Ollama: without a model only the chat degrades (AI_UNAVAILABLE).
+  ai-orchestrator-service:          # Spring AI assistants, ToolGuard, approval requests → ai.events (outbox)
+    <<: *java-service
+    profiles: ["assistant", "ai", "all"]
+    mem_limit: 512m                 # Spring AI + reactor-netty need more than the default 384m
+    build:
+      context: ../..
+      dockerfile: services/ai-orchestrator-service/Dockerfile
+    image: grocery/ai-orchestrator-service:dev
+    depends_on: *db-and-kafka
+    environment:
+      <<: *java-env
+      DB_USERNAME: ai_user
+      DB_PASSWORD: ${AI_DB_PASSWORD:-ai_pass}
+      GROCERY_AI_GATEWAY_URL: http://api-gateway:8080            # every tool calls the business APIs with the user's token
+      AI_PROVIDER: ${AI_PROVIDER:-ollama}                        # ollama | anthropic (Claude) | scripted (no model)
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b-instruct}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}                  # AI_PROVIDER=anthropic: the key, from .env only
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+      AI_MODEL_TIMEOUT: ${AI_MODEL_TIMEOUT:-180s}                # CPU inference is slow (one model call, warm: 15-70 s)
+      AI_APPROVAL_TTL_CUSTOMER: ${AI_APPROVAL_TTL_CUSTOMER:-15m}  # PLACE_ORDER / CANCEL_ORDER
+      AI_APPROVAL_TTL_ADMIN: ${AI_APPROVAL_TTL_ADMIN:-24h}        # refunds, admin cancels, suspensions
+      AI_FOUR_EYES_REFUND_ABOVE: ${AI_FOUR_EYES_REFUND_ABOVE:-2000.00}
+      AI_MESSAGES_PER_HOUR: ${AI_MESSAGES_PER_HOUR:-30}          # per user
+      AI_REFUND_TIMELINE: ${AI_REFUND_TIMELINE:-5–7 working days}   # payment assistant: bank refund timing
+      AI_APPROVAL_SIGNING_KEY: ${AI_APPROVAL_SIGNING_KEY:-}      # PEM; empty = generated at startup (one replica only)
+      AI_APPROVAL_EXPIRY_INTERVAL: ${AI_APPROVAL_EXPIRY_INTERVAL:-30s}
+      # Voice chat: server = through speaches (profile "voice") or OpenAI (AI_VOICE_BASE_URL + AI_VOICE_API_KEY and
+      # OpenAI model names), browser = the browser's own speech features, off = none.
+      AI_VOICE_MODE: ${AI_VOICE_MODE:-browser}
+      AI_VOICE_BASE_URL: ${AI_VOICE_BASE_URL:-http://speaches:8000/v1}
+      AI_VOICE_API_KEY: ${AI_VOICE_API_KEY:-}
+      AI_VOICE_TRANSCRIPTION_MODEL: ${AI_VOICE_TRANSCRIPTION_MODEL:-Systran/faster-whisper-small}
+      AI_VOICE_SPEECH_MODEL: ${AI_VOICE_SPEECH_MODEL:-speaches-ai/Kokoro-82M-v1.0-ONNX}
+      AI_VOICE_SPEECH_VOICE: ${AI_VOICE_SPEECH_VOICE:-af_heart}
+      AI_VOICE_TIMEOUT: ${AI_VOICE_TIMEOUT:-60s}                 # CPU speech recognition is slower than OpenAI
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${AI_ORCHESTRATOR_HOST_PORT:-8115}:8115"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8115/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ------------------------------------------------------------------ frontend (dev server)
+  frontend:
+    profiles: ["frontend", "all"]
+    build:
+      context: ../../frontend/grocery-web
+    image: grocery/grocery-web:dev
+    restart: unless-stopped
+    mem_limit: 768m                     # Vite dev server + in-container test runs
+    environment:
+      # The gateway container by default. When the Spring Boot services run on the host instead
+      # (host-run/start-all.cmd) this is http://host.docker.internal:8080.
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://api-gateway:8080}
+      VITE_USE_POLLING: "true"          # file watching on Windows bind mounts
+      VITE_DEV_ACCOUNTS: ${VITE_DEV_ACCOUNTS:-true}   # "Dev accounts" section on the sign-in screen (dev server only)
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${FRONTEND_HOST_PORT:-6420}:6420"
+    volumes:
+      - ../../frontend/grocery-web:/app
+      # Keep the image's Linux node_modules. After changing package.json/lock:
+      #   docker compose rm -sf frontend && docker volume rm grocery_frontend-node-modules
+      #   docker compose --profile frontend up -d --build frontend
+      - frontend-node-modules:/app/node_modules
+    healthcheck:
+      # 127.0.0.1, not localhost: Vite listens on IPv4 0.0.0.0 and busybox resolves localhost to ::1
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6420/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ------------------------------------------------------------------ frontend-ui (JavaScript copy of the web app)
+  # The same app as `frontend`, written in plain JavaScript (frontend/grocery-web-ui). Own profile, not in "all",
+  # so a full-stack run does not start a second dev server:
+  #   docker compose --profile frontend-ui up -d frontend-ui      # http://localhost:6421
+  # Its Vite proxy drops the Origin header, so the gateway's CORS list (http://localhost:6420) needs no change.
+  frontend-ui:
+    profiles: ["frontend-ui"]
+    build:
+      context: ../../frontend/grocery-web-ui
+    image: grocery/grocery-web-ui:dev
+    restart: unless-stopped
+    mem_limit: 768m                     # Vite dev server + in-container test runs
+    environment:
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://api-gateway:8080}
+      VITE_USE_POLLING: "true"          # file watching on Windows bind mounts
+      VITE_DEV_ACCOUNTS: ${VITE_DEV_ACCOUNTS:-true}
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${FRONTEND_UI_HOST_PORT:-6421}:6421"
+    volumes:
+      - ../../frontend/grocery-web-ui:/app
+      # Keep the image's Linux node_modules (the host's node_modules are Windows builds). After changing package.json/lock:
+      #   docker compose rm -sf frontend-ui && docker volume rm grocery_frontend-ui-node-modules
+      #   docker compose --profile frontend-ui up -d --build frontend-ui
+      - frontend-ui-node-modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6421/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ------------------------------------------------------------------ observability (profile "observability" = Phase 13)
+  # docker compose --profile observability up -d   next to the app profiles (observability/README.md).
+  # Grafana http://localhost:3000 (anonymous viewer; admin/${GRAFANA_ADMIN_PASSWORD:-admin}), Prometheus :9090,
+  # Alertmanager :9093 → emails to ops@grocery.local in Mailpit :8025. Services send OTLP to otel-collector:4318.
+  # No depends_on towards the app containers: exporters retry until their target is up, so starting this profile
+  # never recreates an application container. mem_limit sum of the profile, Mailpit (64m) included: 1856 MiB (1.8 GB).
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 320m                 # GOMEMLIMIT is derived from the cgroup limit (Prometheus 3 default)
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=3d
+      - --storage.tsdb.retention.size=2GB
+      - --web.enable-lifecycle                  # POST /-/reload after editing prometheus.yml or alerts.yml
+      - --web.enable-remote-write-receiver      # k6 performance results (tests/performance)
+      - --enable-feature=exemplar-storage       # exemplars (trace_id) link metrics to Tempo traces
+    volumes:
+      - ./observability/prometheus:/etc/prometheus:ro
+      # The Spring services' addresses: SERVICES_RUN_ON=docker (containers, the default) or host (host-run/
+      # start-all.cmd: the services run on this machine, reached as host.docker.internal). Set it in .env.
+      - ./observability/prometheus/targets/services-${SERVICES_RUN_ON:-docker}.yml:/etc/prometheus-services/targets.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PROMETHEUS_HOST_PORT:-9090}:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.2
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 48m
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.external-url=http://localhost:${ALERTMANAGER_HOST_PORT:-9093}
+      - --cluster.listen-address=               # single instance, no gossip
+    volumes:
+      - ./observability/alertmanager:/etc/alertmanager:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ALERTMANAGER_HOST_PORT:-9093}:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana:12.4.15
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 320m                 # 224m left the Go GC busy at the limit: slow transactions, then locked SQLite
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"           # local only: anyone on this machine can view
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_VIEWERS_CAN_EDIT: "true"           # viewers may use Explore (Loki / Tempo) but not save dashboards
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/platform-overview.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"      # no plugin downloads at startup
+      # Grafana keeps its state in SQLite (grafana-data volume). Without the write-ahead log every write blocks all
+      # readers, and Grafana 12's background jobs (alerting, unified storage, cleanup) ended up in endless
+      # "database is locked (SQLITE_BUSY)" errors and API timeouts. WAL lets reads go on during a write; a query that
+      # still meets a short lock is retried instead of failing.
+      GF_DATABASE_WAL: "true"
+      GF_DATABASE_QUERY_RETRIES: "3"
+      GF_LOG_LEVEL: warn
+      GOMEMLIMIT: 270MiB
+      TZ: UTC
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${GRAFANA_HOST_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  loki:                             # logs, 3 days; labels service + level only (distroless image: no healthcheck)
+    image: grafana/loki:3.7.9
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 192m
+    command: ["-config.file=/etc/loki/loki.yml"]
+    environment:
+      GOMEMLIMIT: 160MiB
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+
+  alloy:                            # Docker logs of the "grocery" compose project → Loki (reads the Docker socket)
+    image: grafana/alloy:v1.21.3
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 160m                 # the first start reads the whole log history of every container
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data      # read positions survive restarts (no duplicate lines)
+      - --disable-reporting
+      - /etc/alloy/config.alloy
+    environment:
+      GOMEMLIMIT: 136MiB
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    healthcheck:                    # no curl/wget in the image: plain HTTP over bash /dev/tcp
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/12345 && printf 'GET /-/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q ' 200 ' <&3"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  tempo:                            # traces, 1 day (distroless image: no healthcheck)
+    image: grafana/tempo:2.10.10
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 256m                 # ingests every span of a k6 run at 100 % sampling
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    environment:
+      GOMEMLIMIT: 216MiB
+    volumes:
+      - ./observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+
+  otel-collector:                   # OTLP in (4317 gRPC / 4318 HTTP, internal) → Tempo (scratch image: no healthcheck)
+    image: otel/opentelemetry-collector-contrib:0.165.0
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 288m                 # ~115 MiB idle + headroom for load tests at 100 % sampling (Phase 13 k6 runs)
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      GOMEMLIMIT: 240MiB
+    volumes:
+      - ./observability/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+
+  kafka-exporter:                   # consumer lag per group/topic/partition, offsets (DLT sizes)
+    image: danielqsj/kafka-exporter:v1.11.0
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 48m
+    command:
+      - --kafka.server=kafka:29092
+      - --kafka.version=3.9.0
+      - --topic.exclude=^_.*                    # Connect / schema-history / registry internals
+      - --log.level=warn
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9308/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  kafka-connect-jmx-exporter:       # Kafka Connect / Debezium JMX (kafka-connect:9012) → Prometheus
+    profiles: ["observability", "all"]
+    build:
+      context: ./observability/kafka-connect-jmx
+    image: grocery/kafka-connect-jmx-exporter:dev
+    restart: unless-stopped
+    mem_limit: 64m
+    volumes:
+      - ./observability/kafka-connect-jmx/kafka-connect.yml:/etc/jmx-exporter/config.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9404/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  mysqld-exporter:                  # read-only user monitoring_user (mysql/init/03-monitoring-user.sql)
+    image: prom/mysqld-exporter:v0.21.0
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 32m
+    command:
+      - --mysqld.address=mysql:3306
+      - --mysqld.username=monitoring_user
+      - --collect.binlog_size
+      - --collect.info_schema.processlist
+      - --collect.info_schema.innodb_metrics
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_MONITORING_PASSWORD:-monitoring_pass}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9104/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.97.0-alpine
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 32m
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9121/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  elasticsearch-exporter:           # Elasticsearch runs with the search/catalog profiles; reports up=0 otherwise
+    image: prometheuscommunity/elasticsearch-exporter:v1.11.0
+    profiles: ["observability", "all"]
+    restart: unless-stopped
+    mem_limit: 32m
+    command:
+      - --es.uri=http://elasticsearch:9200
+      - --es.indices
+      - --es.timeout=10s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9114/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  mysql-data:
+  kafka-data:
+  redis-data:
+  es-data:
+  ollama-models:
+  speaches-models:
+  frontend-node-modules:
+  frontend-ui-node-modules:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+  loki-data:
+  alloy-data:
+  tempo-data:

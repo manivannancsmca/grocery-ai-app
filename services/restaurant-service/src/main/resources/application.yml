@@ -1,0 +1,78 @@
+# Defaults = running from the IDE against the Dockerised infrastructure (profile "local").
+server:
+  port: 8104
+  shutdown: graceful
+
+spring:
+  application:
+    name: restaurant-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/restaurant_db?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC
+    username: ${DB_USERNAME:restaurant_user}
+    password: ${DB_PASSWORD:restaurant_pass}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.default_batch_fetch_size: 100   # lines and timelines of a board page in a few queries
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+    listener:
+      auto-startup: ${KAFKA_LISTENERS_ENABLED:true}
+  # Zero trust: this service validates every JWT itself (signature via identity JWKS, issuer, audience).
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${IDENTITY_JWKS_URI:http://localhost:8101/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER:https://identity.grocery.local}
+          audiences: grocery-api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+info:
+  service: restaurant-service
+  phase: 9
+
+grocery:
+  # Admin platform settings (docs/api/platform-settings.md): fulfillment.acceptance-timeout below is the default of the
+  # restaurants area; an admin's saved value overrides it. Each instance re-reads the overrides at most this often.
+  settings:
+    cache-ttl: ${PLATFORM_SETTINGS_CACHE_TTL:15s}
+  approvals:
+    enabled: true          # Phase 11: verify X-Approval-Token on AI-approved calls (JWKS from APPROVAL_JWKS_URI)
+  restaurant:
+    # "openNow" of the internal menu quote is evaluated against the weekly opening hours in this time zone.
+    timezone: Asia/Kolkata
+  # Phase 8: the restaurant order board (docs/api/phase-8-vendor-and-restaurant-fulfillment.md §2, §3)
+  fulfillment:
+    acceptance-timeout: ${ACCEPTANCE_TIMEOUT:5m}          # acceptBy = received + this; then auto-rejected (NO_RESPONSE)
+    poll-interval: ${ACCEPTANCE_POLL_INTERVAL:15s}        # pause between auto-reject poller runs
+    poll-batch-size: 20                                   # orders claimed per transaction (SKIP LOCKED)
+    auto-reject-enabled: ${ACCEPTANCE_AUTO_REJECT_ENABLED:true}  # the poller in this instance (safe in every replica)
+    default-ready-in-minutes: 20                          # accept without readyInMinutes
+    timezone: Asia/Kolkata                                # the days of the sales report
+
+restaurant:
+  listings:
+    # Restaurants per transaction when an admin re-sends every listing (POST /api/admin/restaurants/listings/republish).
+    republish-batch-size: 100
