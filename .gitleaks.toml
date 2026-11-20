@@ -7,3 +7,8 @@ useDefault = true
 [[allowlists]]
 description = "Jenkins plugin pins (<plugin>:<version>-<build hash>) look like API keys but are public version strings"
 paths = ['''infrastructure/ci/jenkins/local/plugins\.txt''']
+
+[[allowlists]]
+description = "SHA-512 of nginx.org's PUBLIC signing key (the same pin as the official nginx Dockerfiles)"
+regexTarget = "line"
+regexes = ['''^\s*ARG NGINX_KEY_SHA512=[0-9a-f]{128}\s*$''']
