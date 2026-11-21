@@ -96,10 +96,11 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: maven
           cache-dependency-path: "**/pom.xml"
+      # Same flaky-test policy as the services: one re-run, reported as "flaky" when it then passes.
       - name: Build and test grocery-event-schemas and grocery-common
         run: |
-          mvn $MAVEN_ARGS -f libs/grocery-event-schemas/pom.xml install
-          mvn $MAVEN_ARGS -f libs/grocery-common/pom.xml install
+          mvn $MAVEN_ARGS -f libs/grocery-event-schemas/pom.xml install -Dsurefire.rerunFailingTestsCount=1
+          mvn $MAVEN_ARGS -f libs/grocery-common/pom.xml install -Dsurefire.rerunFailingTestsCount=1
       - id: versions
         name: Library versions
         run: |
