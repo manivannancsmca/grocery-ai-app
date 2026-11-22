@@ -2,6 +2,7 @@ package com.grocery.catalogquery.service;
 
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.SortOrder;
+import co.elastic.clients.elasticsearch._types.aggregations.Aggregate;
 import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
@@ -104,6 +105,12 @@ public class ProductSearchService {
     static final int MIN_SUGGEST_LENGTH = 2;
     static final int FACET_SIZE = 20;
 
+    /** The aggregations behind {@code distinctProducts}: different names, and the matches without the description. */
+    static final String DISTINCT = "distinctProducts";
+    static final String NAMED = "namedMatches";
+    /** The name as one keyword (lower case): the same product sold by several stores has one. */
+    static final String NAME_KEYWORD = "name.keyword";
+
     static final String SELLING_PRICE = "sellingPrice";
     static final String IN_STOCK = "inStock";
     static final String RATING_FIELD = "rating";
@@ -157,19 +164,26 @@ public class ProductSearchService {
             return b;
         }));
         SearchPage page = criteria.page();
-        Optional<SearchResponse<ProductDocument>> found = gateway.search(IndexDefinition.PRODUCTS, s -> s
-                .query(query)
-                .from(page.from())
-                .size(page.size())
-                .trackTotalHits(t -> t.enabled(true))
-                .sort(sortFor(criteria.sort(), q))
-                .source(src -> src.filter(f -> f.includes(CARD_FIELDS)))
-                .aggregations("categories", a -> a.terms(t -> t.field("categoryFacet").size(FACET_SIZE)))
-                .aggregations("brands", a -> a.terms(t -> t.field("brandFacet").size(FACET_SIZE)))
-                .aggregations("foodTypes", a -> a.terms(t -> t.field("foodType").size(FoodType.values().length))),
-                ProductDocument.class);
+        Optional<SearchResponse<ProductDocument>> found = gateway.search(IndexDefinition.PRODUCTS, s -> {
+            s.query(query)
+                    .from(page.from())
+                    .size(page.size())
+                    .trackTotalHits(t -> t.enabled(true))
+                    .sort(sortFor(criteria.sort(), q))
+                    .source(src -> src.filter(f -> f.includes(CARD_FIELDS)))
+                    .aggregations("categories", a -> a.terms(t -> t.field("categoryFacet").size(FACET_SIZE)))
+                    .aggregations("brands", a -> a.terms(t -> t.field("brandFacet").size(FACET_SIZE)))
+                    .aggregations("foodTypes", a -> a.terms(t -> t.field("foodType").size(FoodType.values().length)))
+                    .aggregations(DISTINCT, a -> a.cardinality(c -> c.field(NAME_KEYWORD)));
+            if (q != null) {
+                // the different products among the matches by name, brand, category or tags
+                s.aggregations(NAMED, a -> a.filter(textQuery(q, false))
+                        .aggregations(DISTINCT, d -> d.cardinality(c -> c.field(NAME_KEYWORD))));
+            }
+            return s;
+        }, ProductDocument.class);
         if (found.isEmpty()) {
-            return new ProductSearchResponse(List.of(), page.page(), page.size(), 0, 0, ProductFacets.empty());
+            return new ProductSearchResponse(List.of(), page.page(), page.size(), 0, 0, ProductFacets.empty(), 0);
         }
         SearchResponse<ProductDocument> response = found.get();
         List<ProductCard> cards = response.hits().hits().stream()
@@ -180,7 +194,28 @@ public class ProductSearchService {
                 idNameFacet(response, "brands"),
                 Queries.buckets(response, "foodTypes").stream()
                         .map(b -> new FacetValue(b.key().stringValue(), b.docCount())).toList());
-        return new ProductSearchResponse(cards, page.page(), page.size(), total, page.totalPages(total), facets);
+        return new ProductSearchResponse(cards, page.page(), page.size(), total, page.totalPages(total), facets,
+                distinctProducts(response));
+    }
+
+    /**
+     * Different product names among the matches by name, brand, category or tags when there are any (the {@value NAMED}
+     * filter), else among every match: description-only matches ("rice" → Dog Food) count only as a last resort.
+     */
+    static long distinctProducts(SearchResponse<?> response) {
+        Map<String, Aggregate> aggregations = response.aggregations();
+        if (aggregations == null) {
+            return 0;
+        }
+        Aggregate named = aggregations.get(NAMED);
+        if (named != null && named.isFilter() && named.filter().docCount() > 0) {
+            return cardinality(named.filter().aggregations().get(DISTINCT));
+        }
+        return cardinality(aggregations.get(DISTINCT));
+    }
+
+    private static long cardinality(Aggregate aggregate) {
+        return aggregate != null && aggregate.isCardinality() ? aggregate.cardinality().value() : 0;
     }
 
     /** Prefix matches ("as you type") for products and categories. */
@@ -265,11 +300,19 @@ public class ProductSearchService {
      * clause uses the plain analyzer), and a prefix of the name while typing.
      */
     static Query textQuery(String q) {
+        return textQuery(q, true);
+    }
+
+    /** The text query, with or without the description (without: what counts as a product the words name). */
+    static Query textQuery(String q, boolean descriptions) {
+        List<String> fields = descriptions
+                ? List.of("name^4", "brandName^2", "categoryNames^1.5", "tags.text^1.5", "description^0.5")
+                : List.of("name^4", "brandName^2", "categoryNames^1.5", "tags.text^1.5");
         return Query.of(root -> root.bool(b -> b
                 .should(s -> s.multiMatch(m -> m
                         .query(q)
                         .type(TextQueryType.BestFields)
-                        .fields("name^4", "brandName^2", "categoryNames^1.5", "tags.text^1.5", "description^0.5")
+                        .fields(fields)
                         .analyzer(SEARCH_ANALYZER)
                         .operator(Operator.And)))
                 .should(s -> s.multiMatch(m -> m

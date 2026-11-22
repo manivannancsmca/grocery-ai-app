@@ -26,9 +26,18 @@ public final class CatalogDtos {
 
     // ------------------------------------------------------------------ products
 
-    /** PageResponse&lt;ProductCard&gt; + facets. */
+    /**
+     * PageResponse&lt;ProductCard&gt; + facets.
+     *
+     * @param totalElements    every match: each store's listing of a product, and products that only mention the words
+     *                         in their description ("rice" → Dog Food, "chicken and rice")
+     * @param distinctProducts how many different products the search means (added 2026-11-21: the shopping assistant
+     *                         answered "30 rice varieties" from totalElements): one per product name, however many stores
+     *                         sell it, counting only the matches by name, brand, category or tags while there are any
+     *                         (description-only matches count when nothing else matches)
+     */
     public record ProductSearchResponse(List<ProductCard> content, int page, int size, long totalElements,
-                                        int totalPages, ProductFacets facets) {
+                                        int totalPages, ProductFacets facets, long distinctProducts) {
     }
 
     public record ProductFacets(List<FacetEntry> categories, List<FacetEntry> brands, List<FacetValue> foodTypes) {

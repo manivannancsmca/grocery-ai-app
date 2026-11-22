@@ -143,7 +143,9 @@ Read tools of `admin-bi` (any admin role), on the existing admin directories, as
 
 `searchProducts` (shopping) takes `category` by name ("fruits", "Fruit", "vegitables", "dairy"): `CategoryMatcher`
 finds it in `GET /api/catalog/categories` (same name → singular/plural → contained → up to 2 letters off, the largest
-category winning) and searches with its `categoryId`; an unknown name is `CATEGORY_NOT_FOUND` listing the categories.
+category winning) and searches with its `categoryId`. An unknown name with a text search searches every category,
+with a `note` saying so (the small model invents categories: "rice" in "grains"); without a text search it is
+`CATEGORY_NOT_FOUND` listing every category.
 
 ## Voice
 

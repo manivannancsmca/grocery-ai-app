@@ -310,11 +310,60 @@ class StakeholderAwarenessIntegrationTest extends AbstractIntegrationTest {
         assertThat(result.named("tool").getLast().text("summary")).endsWith(" in Fruits");
         assertThat(links(result)).singleElement().asString()
                 .startsWith("/search?q=organic+apples&categoryId=" + fruits);
+    }
 
-        Result unknown = chat(TOKENS.token(customer, "CUSTOMER"), "shopping", "find phones in the gadgets category");
-        assertThat(unknown.named("tool").getLast().text("status")).isEqualTo("FAILED");
-        assertThat(unknown.answer()).contains("There is no category like \"gadgets\". Categories: Vegetables, Fruits")
-                .contains("CATEGORY_NOT_FOUND");
+    @Test
+    void howManyCountsTheDifferentProductsNotEveryStoresListing() {
+        // Live 2026-11-21: "Show me all available rice varieties" → "There are 30 rice varieties": 30 listings of
+        // 7 products (Daawat Basmati in 7 stores), with products that only mention rice (Dog Food).
+        UUID customer = UUID.randomUUID();
+        stubCart(Fixtures.defaultCart());
+        List<Map<String, Object>> cards = List.of(
+                Fixtures.productCard(UUID.randomUUID(), "Red Rice", "105.00", true),
+                Fixtures.productCard(UUID.randomUUID(), "Brown Rice", "125.00", true),
+                Fixtures.productCard(UUID.randomUUID(), "Idli Rice", "54.00", true),
+                Fixtures.productCard(UUID.randomUUID(), "Ponni Rice", "62.00", true),
+                Fixtures.productCard(UUID.randomUUID(), "Daawat Basmati Rice", "120.00", true));
+        GATEWAY.json("GET", "/api/search/products", 200, Fixtures.json(Fixtures.map("content", cards, "page", 0,
+                "size", 5, "totalElements", 30, "totalPages", 6, "facets", Fixtures.map("categories", List.of(),
+                        "brands", List.of(), "foodTypes", List.of()), "distinctProducts", 7)));
+
+        Result result = chat(TOKENS.token(customer, "CUSTOMER"), "shopping", "find rice");
+
+        assertThat(result.named("tool").getLast().text("summary")).isEqualTo("Found 7 products for “rice” (showing 5)");
+        assertThat(result.answer()).startsWith("I found 7 products for “rice”. The first 5:");
+        JsonNode forModel = json.readTree(lastToolResult(model.prompts().getLast()));
+        assertThat(forModel.get("totalFound").asInt()).isEqualTo(7);
+        assertThat(forModel.get("listings").asInt()).isEqualTo(30);
+    }
+
+    @Test
+    void aCategoryThatDoesNotExistSearchesEveryCategory() {
+        // Live 2026-11-21: "Show me all available rice varieties" became rice in "grains", a category nobody has; the
+        // search failed and the assistant answered with a list of categories instead of the rice.
+        UUID customer = UUID.randomUUID();
+        stubCart(Fixtures.defaultCart());
+        GATEWAY.json("GET", "/api/catalog/categories", 200, "[{\"id\":\"" + UUID.randomUUID()
+                + "\",\"name\":\"Vegetables\",\"productCount\":30,\"children\":[]},{\"id\":\"" + UUID.randomUUID()
+                + "\",\"name\":\"Rice and Rice Products\",\"productCount\":12,\"children\":[]}]");
+        GATEWAY.json("GET", "/api/search/products", 200, Fixtures.searchResults(List.of(
+                Fixtures.productCard(Fixtures.RICE, "Ponni Rice", "62.00", true))));
+
+        Result result = chat(TOKENS.token(customer, "CUSTOMER"), "shopping", "find rice in the grains category");
+
+        assertThat(GATEWAY.requests("GET", "/api/search/products")).singleElement().satisfies(search -> {
+            assertThat(search.param("q")).isEqualTo("rice");
+            assertThat(search.param("categoryId")).isNull();
+        });
+        assertThat(result.named("tool").getLast().text("status")).isEqualTo("SUCCEEDED");
+        assertThat(result.named("tool").getLast().text("summary")).isEqualTo("Found 1 product for “rice”");
+        assertThat(result.answer()).contains("Ponni Rice");
+        assertThat(links(result)).singleElement().asString().isEqualTo("/search?q=rice");
+        // the model is told why the category was left out
+        assertThat(json.readTree(lastToolResult(model.prompts().getLast())).get("note").asString())
+                .isEqualTo("There is no category like \"grains\"; these are from every category.");
+        assertThat(auditRows(customer)).singleElement().satisfies(row -> assertThat(row)
+                .containsEntry("tool", "searchProducts").containsEntry("status", "SUCCEEDED"));
     }
 
     @Test

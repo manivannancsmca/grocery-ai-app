@@ -275,6 +275,28 @@ class ShoppingCommandsTest {
         }
     }
 
+    private static JsonNode sized(String unit, String price, String store, boolean inStock) {
+        return JSON.readTree("{\"id\":\"" + UUID.randomUUID() + "\",\"name\":\"Ponni Rice\",\"unitLabel\":\"" + unit
+                + "\",\"price\":{\"sellingPrice\":" + price + "},\"vendor\":{\"id\":\"" + store + "\",\"name\":\"Store "
+                + store + "\"},\"inStock\":" + inStock + "}");
+    }
+
+    @Test
+    void aProductAnswerQuotesTheCheapestStoreOfThePackSizeShown() {
+        List<String> stores = List.of("near", "far", "farther");
+        JsonNode nearKilo = sized("1 kg", "65", "near", true);
+        JsonNode farKilo = sized("1 kg", "62", "far", true);
+        JsonNode fartherKilo = sized("1 kg", "50", "farther", false);       // cheapest, but out of stock
+        JsonNode halfKilo = sized("500 g", "35", "near", true);             // another pack size: not compared
+        assertThat(ShoppingCommands.quoted(List.of(nearKilo, halfKilo, farKilo, fartherKilo), stores)).isSameAs(farKilo);
+        // the same price: the nearer store
+        JsonNode nearSame = sized("1 kg", "62", "near", true);
+        assertThat(ShoppingCommands.quoted(List.of(farKilo, nearSame), stores)).isSameAs(nearSame);
+        // nowhere in stock: the cheapest of them, shown as out of stock
+        assertThat(ShoppingCommands.quoted(List.of(sized("1 kg", "70", "near", false), fartherKilo), stores))
+                .isSameAs(fartherKilo);
+    }
+
     @Test
     void oneListingPerProductByPrice() {
         // one listing per product, in stock: the cheapest, then the nearest store; the products by that price
@@ -326,6 +348,29 @@ class ShoppingCommandsTest {
         assertThat(ShoppingCommands.parse("find me some paneer")).isEqualTo(new ShoppingCommands.Search("paneer"));
         assertThat(ShoppingCommands.parse("atta 5 kilo irukka?")).isEqualTo(new ShoppingCommands.Search("atta"));
         assertThat(ShoppingCommands.parse("is there any ghee")).isEqualTo(new ShoppingCommands.Search("ghee"));
+    }
+
+    @Test
+    void askingForAllOfAKindIsASearchForTheWholeList() {
+        // Live 2026-11-21: these words were searched as they are, found nothing, and the model listed 5 of 7 kinds.
+        assertThat(ShoppingCommands.parse("Show me all available rice varieties."))
+                .isEqualTo(new ShoppingCommands.Search("rice", true));
+        assertThat(ShoppingCommands.parse("list all the dals")).isEqualTo(new ShoppingCommands.Search("dals", true));
+        assertThat(ShoppingCommands.parse("what rice varieties do you have?"))
+                .isEqualTo(new ShoppingCommands.Search("rice", true));
+        assertThat(ShoppingCommands.parse("which brands of ghee do you have"))
+                .isEqualTo(new ShoppingCommands.Search("ghee", true));
+        assertThat(ShoppingCommands.parse("can you show me every kind of biscuit"))
+                .isEqualTo(new ShoppingCommands.Search("biscuit", true));
+        assertThat(ShoppingCommands.parse("rice varieties available?"))
+                .isEqualTo(new ShoppingCommands.Search("rice", true));
+        // a plain question stays a short list
+        assertThat(ShoppingCommands.parse("show me basmati rice")).isEqualTo(new ShoppingCommands.Search("basmati rice"));
+        // no product named: the model
+        assertThat(ShoppingCommands.parse("show me all")).isNull();
+        assertThat(ShoppingCommands.parse("show me all products")).isNull();
+        assertThat(ShoppingCommands.parse("list all varieties")).isNull();
+        assertThat(ShoppingCommands.parse("list my orders")).isNull();
     }
 
     @Test

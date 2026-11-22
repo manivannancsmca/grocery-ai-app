@@ -61,6 +61,11 @@ public class ShoppingCommands {
     static final int MAX_QUANTITY = 20;
     static final int MAX_ITEMS = 3;
     static final int MAX_OPTIONS = 5;
+    /**
+     * Different products listed for "show me all …" (2026-11-21): this answer is written by code, so a long list costs
+     * nothing (the local model writes ~4–5 tokens/s: 20 lines would take it two minutes).
+     */
+    static final int MAX_ALL_OPTIONS = 20;
     /** "the last one" in {@link Item#reference()}. */
     static final int LAST = Integer.MAX_VALUE;
     /** "that", "it" in {@link Item#reference()}. */
@@ -86,8 +91,17 @@ public class ShoppingCommands {
             PriceSearch, Reply {
     }
 
-    /** "do you have basmati rice", "which biscuits do you have", "find paneer", "atta irukka". */
-    record Search(String what) implements Command {
+    /**
+     * "do you have basmati rice", "which biscuits do you have", "find paneer", "atta irukka".
+     *
+     * @param all the customer asked for the whole list ("show me all available rice varieties", "list all dals",
+     *            "what rice varieties do you have"): every different product is listed, not only the first few
+     */
+    record Search(String what, boolean all) implements Command {
+
+        Search(String what) {
+            this(what, false);
+        }
     }
 
     /** What a price answer names first. */
@@ -211,8 +225,17 @@ public class ShoppingCommands {
             + "|are there|got)(?: any)? (.+?)(?: available| in stock)?$"
             + "|^(?:which|what) (.+?) (?:do you have|do u have|have you got|are there|are available|you have"
             + "|do you sell)$"
-            + "|^(?:show me|find(?: me)?|search(?: for)?|look for|looking for)(?: some| any)? (.+)$"
+            + "|^(?:show(?: me)?|list(?: out)?|display|find(?: me)?|search(?: for)?|look for|looking for)(?: some| any)?"
+            + " (.+)$"
             + "|^(.+?) (?:irukka|irukkaa|iruka|hai kya|milega|available)$");
+    /** The whole list asked for: "all (the) (available) …", "every …", "all kinds of …" (2026-11-21). */
+    private static final Pattern ALL_OF = Pattern.compile("^(?:all|every)(?: of)?(?: the| your)?(?: available| different)?"
+            + "(?: (?:kinds?|types?|varieties|variety|sorts?|brands?) of)?(?: the)? ");
+    private static final Pattern KINDS_OF = Pattern.compile("^(?:(?:the|available|different) )*(?:kinds?|types?"
+            + "|varieties|variety|sorts?|brands?) of (?:the )?");
+    private static final Pattern KINDS = Pattern.compile(" (?:varieties|variety|kinds|types|brands|options)$");
+    private static final Pattern AVAILABLE = Pattern.compile("^(?:available|different) | (?:available|in stock"
+            + "|you have|you sell|you've got)$");
     /** What a product search is not for: the customer's own things, restaurants and their food. */
     private static final Pattern NOT_A_PRODUCT = Pattern.compile("\\b(?:orders?|cart|basket|payments?|refunds?"
             + "|returns?|complaints?|address(?:es)?|account|profile|deliver(?:y|ies)|restaurants?|menus?|dish(?:es)?"
@@ -368,10 +391,38 @@ public class ShoppingCommands {
                     || rest.matches("(?:do|you|u|i|we|it|that|this|anything|something|everything|stuff|things?)")) {
                 return null;                                   // "what do you have": not a product
             }
-            Item item = parseItem(rest);                       // "atta 5 kilo" → atta
-            return item == null || item.what() == null ? null : new Search(item.what());
+            Search asked = searchFor(rest);                    // "all available rice varieties" → rice, all
+            Item item = asked == null ? null : parseItem(asked.what());   // "atta 5 kilo" → atta
+            return item == null || item.what() == null ? null : new Search(item.what(), asked.all());
         }
         return reply(text);
+    }
+
+    /**
+     * A product question's words without the "whole list" wording, and whether there was some: "all available rice
+     * varieties" → rice (all), "rice varieties", "all kinds of dal", "brands of ghee", "every ghee you have". Live
+     * 2026-11-21: "Show me all available rice varieties" searched those four words, found nothing and went to the
+     * model, which listed 5 of the 7 kinds of rice. Null when no product is named ("all", "all products").
+     */
+    static Search searchFor(String rest) {
+        String what = rest.strip();
+        boolean all = false;
+        String before;
+        do {
+            before = what;
+            Matcher found;
+            if ((found = ALL_OF.matcher(what)).find() || (found = KINDS_OF.matcher(what)).find()) {
+                all = true;
+                what = what.substring(found.end()).strip();
+            }
+            if ((found = KINDS.matcher(what)).find()) {
+                all = true;
+                what = what.substring(0, found.start()).strip();
+            }
+            what = AVAILABLE.matcher(what).replaceAll("").strip();
+        } while (!what.equals(before));
+        return what.isEmpty() || PRICE_GENERIC.matcher(what).matches()
+                || what.matches("(?:kinds?|types?|varieties|variety|sorts?|brands?|options)") ? null : new Search(what, all);
     }
 
     /**
@@ -587,7 +638,7 @@ public class ShoppingCommands {
             case Remove remove -> changeLine(turn, remove.item().what(),
                     remove.item().counted() ? -remove.item().count() : 0, false);
             case SetQuantity set -> changeLine(turn, set.what(), set.quantity(), true);
-            case Search search -> search(turn, search.what());
+            case Search search -> search(turn, search.what(), search.all());
             case PriceSearch price -> price.add() == null ? prices(turn, price) : addByPrice(turn, price);
         };
         return Optional.ofNullable(answer);
@@ -598,10 +649,14 @@ public class ShoppingCommands {
     /**
      * "do you have basmati rice": searchProducts through the guard (its chip, its link to all results, and the
      * products in the memory for "add 2 of that"), answered with the distinct products found. Nothing found → the
-     * model (it may mean a restaurant dish, or other words).
+     * model (it may mean a restaurant dish, or other words). {@code all} ("show me all available rice varieties"):
+     * every different product, up to {@link #MAX_ALL_OPTIONS}, from catalog-query's largest page. Each line quotes the
+     * cheapest store ({@link #quoted}); "add 2 of the first one" adds that store's listing.
      */
-    private String search(ToolTurn turn, String what) {
-        List<JsonNode> found = search(turn, what, shoppingTools.storeScope(turn.http()).vendorIds());
+    private String search(ToolTurn turn, String what, boolean all) {
+        int pageSize = all ? PRICE_SEARCH_SIZE : SEARCH_SIZE;
+        List<String> stores = shoppingTools.storeScope(turn.http()).vendorIds();
+        List<JsonNode> found = search(turn, what, stores, pageSize);
         if (found == null || found.isEmpty()) {
             return null;
         }
@@ -617,27 +672,36 @@ public class ShoppingCommands {
         // The search also matches descriptions and category names ("ghee" → Halwa, Ladoo; "biscuits" → Dog Biscuits):
         // the products the words mean when there are (Britannia Marie Gold for "biscuits"), else what it found.
         List<JsonNode> matching = relevant(turn, found, what);
+        List<JsonNode> listed = matching.isEmpty() ? found : matching;
+        int limit = all ? MAX_ALL_OPTIONS : MAX_OPTIONS;
         Map<String, List<JsonNode>> byName = new LinkedHashMap<>();
-        (matching.isEmpty() ? found : matching).forEach(card -> {
-            if (byName.containsKey(Json.text(card, "name")) || byName.size() < MAX_OPTIONS) {
+        listed.forEach(card -> {
+            if (byName.containsKey(Json.text(card, "name")) || byName.size() < limit) {
                 byName.computeIfAbsent(Json.text(card, "name"), name -> new ArrayList<>()).add(card);
             }
         });
-        // "add 2 of the second one" means the second product listed here
-        ObjectNode shown = choiceNode("shown");
-        ArrayNode options = shown.putArray("options");
-        byName.keySet().forEach(options::add);
-        turn.rememberResult(CHOICE, shown.toString());
+        List<JsonNode> quotes = byName.values().stream().map(cards -> quoted(cards, stores)).toList();
+        // "add 2 of the second one" means the second product listed here, from the store whose price was given
+        rememberShown(turn, quotes);
         List<String> lines = new ArrayList<>();
-        byName.forEach((name, cards) -> {
-            JsonNode card = cards.getFirst();
-            String unit = Json.text(card, "unitLabel");
-            BigDecimal price = price(card);
-            boolean inStock = cards.stream().anyMatch(each -> Json.bool(each, "inStock"));
-            lines.add(name + (unit == null ? "" : " (" + unit + ")") + (price == null ? "" : " – " + Money.inr(price))
-                    + (inStock ? "" : " (out of stock)"));
-        });
-        int total = Objects.requireNonNullElse(Json.integer(result, "totalFound"), products.size());
+        for (JsonNode listing : quotes) {
+            String unit = Json.text(listing, "unitLabel");
+            lines.add((price(listing) == null ? Json.text(listing, "name") + (unit == null ? "" : " (" + unit + ")")
+                    : priceLine(listing)) + (Json.bool(listing, "inStock") ? "" : " (out of stock)"));
+        }
+        // the search page lists each store's offer: its count, when it differs from the different products
+        int total = Objects.requireNonNullElse(Json.integer(result, "listings"),
+                Objects.requireNonNullElse(Json.integer(result, "totalFound"), products.size()));
+        if (all) {
+            // every one: the page held every listing and each different product is listed
+            boolean complete = found.size() < pageSize
+                    && byName.size() == listed.stream().map(card -> Json.text(card, "name")).distinct().count();
+            String intro = byName.size() == 1 ? "There's 1 product for “" + what + "”:"
+                    : complete ? "Here are all " + byName.size() + " different products for “" + what + "”:"
+                    : "Here are " + byName.size() + " different products for “" + what + "”:";
+            return intro + numbered(lines) + "\nSay “add 2 of the first one” to add one"
+                    + (complete ? "." : ", or open the search page to see them all.");
+        }
         return "Yes, here's what I found for “" + what + "”:" + numbered(lines)
                 + "\nSay “add 2 of the first one” to add one" + (total > products.size()
                 ? ", or open the search page to see all " + total + " results." : ".");
@@ -996,6 +1060,22 @@ public class ShoppingCommands {
             return prefix + Money.inr(max) + " or less";
         }
         return min != null ? prefix + Money.inr(min) + " or more" : "";
+    }
+
+    /**
+     * The listing a product answer quotes for one product (its listings in the search's order, one name): of the first
+     * listing's pack size, in stock when one is, the cheapest store, then the nearest ({@code stores} order). 2026-11-21
+     * (user's choice): each line showed the first store's price, not the cheapest.
+     */
+    static JsonNode quoted(List<JsonNode> listings, List<String> stores) {
+        String unit = Json.text(listings.getFirst(), "unitLabel");
+        List<JsonNode> sameSize = listings.stream()
+                .filter(card -> Objects.equals(unit, Json.text(card, "unitLabel"))).toList();
+        Comparator<JsonNode> cheaperThenNearer = Comparator.<JsonNode, BigDecimal>comparing(ShoppingCommands::price,
+                        Comparator.nullsLast(Comparator.<BigDecimal>naturalOrder()))
+                .thenComparingInt(card -> rank(stores, Json.text(card, "vendor.id")));
+        return sameSize.stream().filter(card -> Json.bool(card, "inStock")).min(cheaperThenNearer)
+                .orElseGet(() -> sameSize.stream().min(cheaperThenNearer).orElseThrow());
     }
 
     /** "Milk (500 ml) – ₹33.00 at Velachery Green Grocers". */
@@ -1759,9 +1839,13 @@ public class ShoppingCommands {
 
     /** Products for {@code query} in {@code stores} (null = every store), or null when the search failed. */
     private List<JsonNode> search(ToolTurn turn, String query, List<String> stores) {
+        return search(turn, query, stores, SEARCH_SIZE);
+    }
+
+    private List<JsonNode> search(ToolTurn turn, String query, List<String> stores, int size) {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("q", query);
-        params.put("size", SEARCH_SIZE);
+        params.put("size", size);
         params.put("vendorId", stores);
         return api.get(turn.http(), "/api/search/products", params) instanceof Fetch.Ok ok
                 ? Json.list(ok.body(), "content") : null;

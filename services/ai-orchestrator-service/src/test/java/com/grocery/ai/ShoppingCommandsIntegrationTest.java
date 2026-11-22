@@ -98,8 +98,8 @@ class ShoppingCommandsIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(toolEvents(found)).containsExactly("searchProducts:STARTED", "searchProducts:SUCCEEDED");
         assertThat(found.answer()).isEqualTo("Yes, here's what I found for “basmati rice”:\n"
-                + "1. Daawat Basmati Rice (1 kg) – ₹120.00\nSay “add 2 of the first one” to add one, or open the "
-                + "search page to see all 6 results.");
+                + "1. Daawat Basmati Rice (1 kg) – ₹120.00 at Vijaya Nagar Fresh Mart\nSay “add 2 of the first one” "
+                + "to add one, or open the search page to see all 6 results.");
 
         Result added = chat(token, "shopping", "add 2 packets of that",
                 UUID.fromString(found.first("conversation").text("conversationId")));
@@ -115,13 +115,63 @@ class ShoppingCommandsIntegrationTest extends AbstractIntegrationTest {
                 card(UUID.randomUUID(), "Ghee", "500 ml", "340.00", NEAR, "Vijaya Nagar Fresh Mart", null),
                 card(UUID.randomUUID(), "Halwa", "250 g", "108.00", NEAR, "Vijaya Nagar Fresh Mart", null))));
         Result ghee = chat(token, "shopping", "do you have ghee?");
-        assertThat(ghee.answer()).isEqualTo("Yes, here's what I found for “ghee”:\n1. Ghee (500 ml) – ₹340.00\n"
-                + "Say “add 2 of the first one” to add one.");
+        assertThat(ghee.answer()).isEqualTo("Yes, here's what I found for “ghee”:\n1. Ghee (500 ml) – ₹340.00 at "
+                + "Vijaya Nagar Fresh Mart\nSay “add 2 of the first one” to add one.");
 
         // nothing found: the model takes it (a restaurant dish, other words)
         GATEWAY.json("GET", "/api/search/products", 200, Fixtures.searchResults(List.of()));
         chat(token, "shopping", "do you have quinoa");
         assertThat(model.prompts()).isNotEmpty();
+    }
+
+    @Test
+    void showMeAllListsEveryDifferentProductAndAnyOfThemCanBeAdded() {
+        // Live 2026-11-21: "Show me all available rice varieties." searched those four words, found nothing, and the
+        // model listed 5 of the 7 kinds of rice.
+        String token = TOKENS.token(UUID.randomUUID(), "CUSTOMER");
+        stubHomeAndStores();
+        stubCart(Fixtures.cart(List.of()));
+        List<String> kinds = List.of("Red Rice", "Brown Rice", "Idli Rice", "Ponni Rice", "Daawat Basmati Rice",
+                "India Gate Ponni Boiled Rice", "Ready-to-Eat Sambar Rice");
+        List<Map<String, Object>> cards = new java.util.ArrayList<>();
+        UUID cheaperSambarRice = UUID.randomUUID();
+        Map<String, Object> cheaper = null;
+        for (String kind : kinds) {
+            boolean sambar = "Ready-to-Eat Sambar Rice".equals(kind);
+            cards.add(card(UUID.randomUUID(), kind, "1 kg", "100.00", NEAR, "Vijaya Nagar Fresh Mart", null));
+            // the store found second sells one of them for less: that is the price shown and the listing added
+            Map<String, Object> far = card(sambar ? cheaperSambarRice : UUID.randomUUID(), kind, "1 kg",
+                    sambar ? "90.00" : "100.00", FAR, "Guindy Daily Fresh", null);
+            cards.add(far);
+            cheaper = sambar ? far : cheaper;
+        }
+        // a product that only mentions rice in its description
+        cards.add(card(UUID.randomUUID(), "Dog Food", "3 kg", "950.00", NEAR, "Vijaya Nagar Fresh Mart", null));
+        GATEWAY.json("GET", "/api/search/products", 200, Fixtures.searchResults(cards));
+        GATEWAY.json("GET", "/api/catalog/products/" + cheaperSambarRice, 200, Fixtures.json(cheaper));
+        GATEWAY.on("POST", "/api/cart/items", request -> FakeGateway.Response.json(200,
+                cartWith(cheaperSambarRice, "Ready-to-Eat Sambar Rice", 2, "90.00")));
+
+        Result all = chat(token, "shopping", "Show me all available rice varieties.");
+
+        assertThat(model.prompts()).as("no model call").isEmpty();
+        StringBuilder expected = new StringBuilder("Here are all 7 different products for “rice”:");
+        for (int i = 0; i < kinds.size() - 1; i++) {
+            expected.append('\n').append(i + 1).append(". ").append(kinds.get(i))
+                    .append(" (1 kg) – ₹100.00 at Vijaya Nagar Fresh Mart");       // same price: the nearer store
+        }
+        expected.append("\n7. Ready-to-Eat Sambar Rice (1 kg) – ₹90.00 at Guindy Daily Fresh");
+        assertThat(all.answer()).isEqualTo(expected + "\nSay “add 2 of the first one” to add one.");
+        FakeGateway.Request search = GATEWAY.requests("GET", "/api/search/products").getFirst();
+        assertThat(search.param("q")).isEqualTo("rice");
+        assertThat(search.param("size")).as("catalog-query's largest page").isEqualTo("50");
+
+        // the seventh of the list, from the store whose price was shown
+        Result added = chat(token, "shopping", "add 2 of the 7th one",
+                UUID.fromString(all.first("conversation").text("conversationId")));
+        JsonNode body = GATEWAY.requests("POST", "/api/cart/items").getFirst().json();
+        assertThat(body.get("productId").asString()).isEqualTo(cheaperSambarRice.toString());
+        assertThat(added.answer()).startsWith("Added 2 × Ready-to-Eat Sambar Rice");
     }
 
     @Test
@@ -223,7 +273,8 @@ class ShoppingCommandsIntegrationTest extends AbstractIntegrationTest {
 
         Result which = chat(token, "shopping", "which biscuits do you have?");
         assertThat(which.answer()).isEqualTo("Yes, here's what I found for “biscuits”:\n"
-                + "1. Britannia Marie Gold (200 g) – ₹35.00\n2. Britannia Good Day Biscuits (200 g) – ₹40.00\n"
+                + "1. Britannia Marie Gold (200 g) – ₹35.00 at Vijaya Nagar Fresh Mart\n"
+                + "2. Britannia Good Day Biscuits (200 g) – ₹40.00 at Vijaya Nagar Fresh Mart\n"
                 + "Say “add 2 of the first one” to add one.");
         assertThat(model.prompts()).isEmpty();
     }

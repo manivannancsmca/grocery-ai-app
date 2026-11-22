@@ -96,6 +96,36 @@ class ProductSearchIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void distinctProductsCountsEachNamedProductOnceAndDescriptionMatchesOnlyAsALastResort() throws Exception {
+        // Live 2026-11-21: "rice" matched 30 listings (Daawat Basmati in 7 stores, Dog Food "chicken and rice"), and
+        // the shopping assistant answered "30 rice varieties".
+        List<Cat> staples = List.of(Cat.of("Rice and Rice Products"));
+        index("Ponni Rice", staples);
+        String otherStore = id();
+        String elsewhere = id();
+        publishCatalogEvent("ProductUpserted", elsewhere, product(elsewhere, otherStore, "Ponni Rice", 1, staples));
+        index("Idli Rice", staples);
+        String dogFoodId = id();
+        Map<String, Object> dogFood = product(dogFoodId, vendor, "Dog Food", 1, List.of(Cat.of("Pet Care")));
+        dogFood.put("description", "Dry food for adult dogs, chicken and rice.");
+        dogFood.put("tags", List.of());
+        publishCatalogEvent("ProductUpserted", dogFoodId, dogFood);
+        refresh();
+
+        JsonNode rice = search("q", "rice");
+        assertThat(rice.get("totalElements").asLong()).isEqualTo(4);           // every listing, Dog Food last
+        assertThat(names(rice).getLast()).isEqualTo("Dog Food");
+        assertThat(rice.get("distinctProducts").asLong()).isEqualTo(2);         // Ponni Rice and Idli Rice
+        // only a description mentions it: then that is what the words mean
+        JsonNode chicken = search("q", "chicken");
+        assertThat(names(chicken)).containsExactly("Dog Food");
+        assertThat(chicken.get("distinctProducts").asLong()).isEqualTo(1);
+        // no words: every product once
+        assertThat(search().get("distinctProducts").asLong()).isEqualTo(3);
+        assertThat(search("q", "nothing like this").get("distinctProducts").asLong()).isZero();
+    }
+
+    @Test
     void cardsCarryAShortDescription() throws Exception {
         String longId = id();
         Map<String, Object> soup = product(longId, vendor, "Garden Soup Mix", 1, vegetables);

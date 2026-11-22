@@ -50,7 +50,8 @@ public class ShoppingTools {
         return List.of(
                 ToolSpec.run("searchProducts", "Searched products",
                         "Search the grocery catalog: up to 5 products with price and stock, and totalFound, the "
-                                + "number of ALL matching products. Use it before adding a product, to get its id. "
+                                + "number of ALL the different matching products (one product sold by several "
+                                + "stores counts once). Use it before adding a product, to get its id. "
                                 + "Leave query out to browse or count by price alone: for \"how many products under "
                                 + "₹50\" call it with maxPrice 50 and no query, and answer with totalFound (not with "
                                 + "the number of products listed).", RiskClass.READ, CUSTOMER,
@@ -186,6 +187,7 @@ public class ShoppingTools {
         // A category the customer names ("in the fruits category") becomes the search's categoryId filter.
         CategoryMatcher.Category category = null;
         String categoryName = call.args().string("category");
+        String noSuchCategory = null;
         if (categoryName != null) {
             Fetch tree = api.get(call.http(), "/api/catalog/categories");
             if (!(tree instanceof Fetch.Ok ok)) {
@@ -194,12 +196,19 @@ public class ShoppingTools {
             }
             List<CategoryMatcher.Category> categories = CategoryMatcher.flatten(ok.body());
             category = CategoryMatcher.match(categories, categoryName).orElse(null);
-            if (category == null) {
+            if (category == null && query == null) {
+                // Only a category to browse: name them all, so the model can offer the right one.
                 return new ToolResult.Failed("CATEGORY_NOT_FOUND", "There is no category like \"" + categoryName
-                        + "\". Categories: " + String.join(", ", CategoryMatcher.suggestions(categories, 15))
-                        + ".", 404);
+                        + "\". Categories: " + String.join(", ", CategoryMatcher.suggestions(categories,
+                        CATEGORY_SUGGESTIONS)) + ".", 404);
             }
-            params.put("categoryId", category.id());
+            if (category == null) {
+                // The small model invents categories ("rice" in "grains"; live 2026-11-21): with words to look for,
+                // every category is searched, and the result says so, instead of failing the customer's question.
+                noSuchCategory = categoryName;
+            } else {
+                params.put("categoryId", category.id());
+            }
         }
         CategoryMatcher.Category matched = category;
         if (call.args().isTrue("inStockOnly")) {
@@ -234,23 +243,34 @@ public class ShoppingTools {
         }
         CategoryMatcher.Category searched = emptyCategory == null ? matched : null;
         CategoryMatcher.Category nothingIn = emptyCategory;
+        String unknownCategory = noSuchCategory;
         return Results.from(found, ok -> {
             ArrayNode products = Results.array();
             for (JsonNode card : Json.list(ok.body(), "content")) {
                 products.add(productCard(card));
             }
-            int totalFound = Objects.requireNonNullElse(Json.integer(ok.body(), "totalElements"), products.size());
+            int listings = Objects.requireNonNullElse(Json.integer(ok.body(), "totalElements"), products.size());
+            // "How many": the different products the words name (catalog-query's distinctProducts, 2026-11-21), not
+            // every store's listing nor products that only mention the words ("30 rice varieties" for 7).
+            int totalFound = Objects.requireNonNullElse(Json.integer(ok.body(), "distinctProducts"), listings);
             ObjectNode result = Results.object();
             Results.put(result, "query", query);
             Results.put(result, "category", searched == null ? null : searched.name());
             if (nothingIn != null) {
                 result.put("note", "Nothing matches in " + nothingIn.name() + "; these are from every category.");
             }
+            if (unknownCategory != null) {
+                result.put("note", "There is no category like \"" + unknownCategory
+                        + "\"; these are from every category.");
+            }
             Results.put(result, "priceFilter", priceFilter(minPrice, maxPrice));
             Results.put(result, "minPrice", Money.scale(minPrice));
             Results.put(result, "maxPrice", Money.scale(maxPrice));
             Results.put(result, "stores", scope.describe());
             result.put("totalFound", totalFound);
+            if (listings != totalFound) {
+                result.put("listings", listings);           // what the search page shows: each store's offer
+            }
             result.put("listed", products.size());
             result.set("products", products);
             String summary = searchSummary(query, minPrice, maxPrice, totalFound, products.size());
@@ -297,6 +317,12 @@ public class ShoppingTools {
         }
         return api.customerOrder(call.http(), number);
     }
+
+    /**
+     * How many category names an unknown category lists: all of them in this catalog (30), not only the largest, which
+     * left out "Rice and Rice Products" for "grains".
+     */
+    static final int CATEGORY_SUGGESTIONS = 40;
 
     /** catalog-query accepts at most this many {@code vendorId} values in one search (the storefront sends as many). */
     static final int MAX_SCOPE_STORES = 50;

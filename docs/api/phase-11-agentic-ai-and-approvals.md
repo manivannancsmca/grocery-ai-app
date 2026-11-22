@@ -479,7 +479,7 @@ was "confirmed" by the next turn). Counted in `grocery_ai_retried_answers_total{
 | remove, set, clear | "remove the tomatoes", "remove 1 milk", "set rice to 3", "clear my cart" | `updateCartItem` |
 | total | "checkout", "how much will it cost with delivery?" | `previewCheckout` |
 | place the order | "place my order" | `previewCheckout`, `placeOrder` (an approval, as from the model) |
-| product questions | "do you have basmati rice?", "which biscuits do you have?", "find paneer", "atta irukka?" | `searchProducts` |
+| product questions | "do you have basmati rice?", "which biscuits do you have?", "find paneer", "atta irukka?"; the whole list (2026-11-21: up to 20 different products, not 5): "show me all available rice varieties", "list all the dals", "what rice varieties do you have?", "which brands of ghee do you have?". Each line quotes the cheapest store for that pack size, in stock first, the nearer on a tie ("Ponni Rice (1 kg) – ₹62.00 at T. Nagar Daily Needs"), and "add 2 of the first one" adds that store's listing | `searchProducts` |
 | prices | "what's the cheapest milk?", "any ghee under ₹400?", "rice between ₹100 and ₹200", "the most expensive ghee", "how much is basmati rice?", "milk price" | `searchProducts` (with `minPrice` / `maxPrice` / `sort`) |
 | add by price | "add the cheapest milk", "add 2 packets of the cheapest milk", "add 2 milk under ₹50" (asks which one when several qualify) | `addToCart` |
 
@@ -537,7 +537,7 @@ a short prompt, 4.0 after a 3,600-token one), and a tool call means two model ca
 **New tools.** `admin-bi` (any admin): `getStakeholderCounts(type?)` and `listStakeholders(type, status?, query?)` over
 `GET /api/admin/{vendors|restaurants|delivery-partners}` and `GET /api/admin/customers` (counts per onboarding status;
 names, cities, dates and ids, never contact data). `shopping`: `searchProducts` takes `category` by name
-(`CATEGORY_NOT_FOUND` lists the categories). Like the storefront, it searches only the stores that deliver to the
+(an unknown name with a text search searches every category, with a `note` saying so; without a text search, `CATEGORY_NOT_FOUND` lists every category). Like the storefront, it searches only the stores that deliver to the
 customer's default address (`GET /api/stores/nearby`, up to 50 `vendorId`s; the result's `stores` says so), every store
 when the address has no location or the store list fails, and answers `NO_STORE_DELIVERS` when no store delivers there.
 A text search in a category that finds nothing is repeated in every category, with a `note` saying so: the small

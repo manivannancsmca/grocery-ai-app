@@ -71,7 +71,13 @@ half-given or out-of-range location, `radiusKm ≤ 0` or more than 50 `vendorId`
   "facets": {
     "categories": [ { "id": "…", "name": "Fresh Vegetables", "count": 3 } ],   // leaf categories of the hits
     "brands":     [ { "id": "…", "name": "Farm Fresh", "count": 2 } ],
-    "foodTypes":  [ { "value": "VEG", "count": 3 } ] } }
+    "foodTypes":  [ { "value": "VEG", "count": 3 } ] },
+  "distinctProducts": 2 }
+  // 2026-11-21 adds distinctProducts: how many DIFFERENT products the search means. totalElements counts every
+  //   listing (the same product in 7 stores = 7) and products that only mention the words in their description
+  //   ("rice" → Dog Food, "chicken and rice"). distinctProducts counts each product name once, among the matches by
+  //   name, brand, category or tags while there are any (description-only matches when nothing else matches; every
+  //   product without q). The shopping assistant answers "how many" with it.
 
 // ProductCard
 { "id": "…", "name": "Tomato", "unitLabel": "500 g", "foodType": "VEG",          // foodType may be null

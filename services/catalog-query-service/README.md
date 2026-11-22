@@ -134,7 +134,9 @@ versions), in any order relative to the others.
   inclusive; products without a price have no `sellingPrice` and never match a price filter; negative or
   `minPrice > maxPrice` → 400 `INVALID_PARAMETER`). Text: synonym-aware `best_fields` (name^4, brand^2,
   category^1.5, tags^1.5, description^0.5, operator AND) OR a fuzzy name/brand match OR a name prefix. Facets: leaf
-  category, brand, food type. Sorts: relevance, newest, `name_asc`, `price_asc`, `price_desc` (unpriced products last
+  category, brand, food type. `distinctProducts` (2026-11-21): a `cardinality` of `name.keyword`, inside a `filter`
+  aggregation of the same text query without the description when that filter has hits (else over every hit), so
+  "rice" counts Ponni Rice once however many stores sell it, and not Dog Food ("chicken and rice"). Sorts: relevance, newest, `name_asc`, `price_asc`, `price_desc` (unpriced products last
   in both directions), `rating` (Phase 12: highest `rating` first, unrated last, then `ratingCount`, then newest),
   always with `productId` as tie-breaker. Cards and the product page carry
   `price: {mrp, sellingPrice, currency, discountPercent} | null` (amounts with 2 decimals), `inStock`, and
