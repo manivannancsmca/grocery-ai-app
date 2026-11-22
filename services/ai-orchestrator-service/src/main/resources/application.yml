@@ -32,6 +32,13 @@ grocery:
       # The model's context window (num_ctx). Ollama's default, 4096, is too small for the shopping assistant's prompt,
       # tools and one tool result. Memory: about 0.6 GB more KV cache than 4096 (see the compose file's ollama service).
       context-tokens: ${AI_OLLAMA_CONTEXT_TOKENS:8192}
+      # Load the model and read these assistants' rules and tools (~3,200 tokens, ~70 s on CPU for shopping) before
+      # the first question: at start-up, and when the assistant panel opens after Ollama unloaded the model (an hour
+      # idle). Without it the first question paid both and could hit model-timeout (ModelWarmUp). "all": every
+      # assistant, one start per different set of tools its roles get (each ~0.3-0.5 GB of Ollama's prompt cache);
+      # or a list such as shopping,admin-bi. The warm-up waits for chats in progress before each read.
+      warm-up: ${AI_WARM_UP:true}
+      warm-up-agents: ${AI_WARM_UP_AGENTS:all}
     # The production model (AI_PROVIDER=anthropic). The key comes from the environment only (AWS: Secrets Manager);
     # without it the assistants answer AI_UNAVAILABLE.
     anthropic:

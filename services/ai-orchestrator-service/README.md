@@ -249,6 +249,8 @@ insights it answers the rules' report as JSON.
 | `grocery.ai.mcp.enabled` | `AI_MCP_ENABLED` | `true`: `searchProducts` and `getOrderStatus` through catalog-query's and order-service's MCP servers (REST when one cannot be reached) |
 | `grocery.ai.gateway-url` | `GROCERY_AI_GATEWAY_URL` | `http://localhost:8080` (docker: `http://api-gateway:8080`) |
 | `grocery.ai.ollama.base-url` / `.model` | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` (docker: `http://ollama:11434`) / `qwen3:4b-instruct` |
+| `grocery.ai.ollama.warm-up` / `.warm-up-agents` | `AI_WARM_UP` / `AI_WARM_UP_AGENTS` | `true` / `all` (or ids such as `shopping,admin-bi`; see below) |
+| `grocery.ai.ollama.warm-up-quiet` | — | `30s`: no chat may have used the model for this long before the next warm-up read |
 | `grocery.ai.model-timeout` | `AI_MODEL_TIMEOUT` | `120s` |
 | `grocery.ai.messages-per-hour` | `AI_MESSAGES_PER_HOUR` | `30` |
 | `grocery.ai.tool-timeout`, `max-tool-calls`, `memory-messages`, `status-cache-ttl` | — | `5s`, `6`, `20`, `30s` |
@@ -266,6 +268,33 @@ insights it answers the rules' report as JSON.
 
 Ollama runs with thinking off (`spring.ai.ollama.chat.think=false`) and temperature 0.2; Spring AI's model choice
 follows the provider (`spring.ai.model.chat=${grocery.ai.provider}`), so no Ollama bean exists in scripted mode.
+
+**Warm-up (Ollama, 2026-11-21; `ModelWarmUp`).** A cold first question paid for loading the model and for reading the
+assistant's rules and tool definitions (~3,200 tokens for `shopping`, ~70 s at ~48 tokens/s on CPU) before its first
+token; with little free memory that passed the 120 s timeout ("took too long to answer"). The service now does both
+before anyone asks: once it has started, and again when the assistant panel calls `GET /api/ai/status` while the model
+is not loaded (Ollama unloads it after `OLLAMA_KEEP_ALIVE`, an hour idle; checked at most once a minute). First
+Ollama's "only load" request (`POST /api/chat` without messages, the chat's `num_ctx`, a 10-minute timeout: a load
+cut short is aborted by Ollama), then one call per start through the chat's own `ChatClient`: an assistant's rules
+with the tools a role is offered (one token answered, no tool runs), so the start Ollama keeps is the one a real turn
+reuses (`ChatService.prompt`). Since 2026-11-22 `warm-up-agents` is `all`: every assistant, one start per different set
+of tools its roles get, 11 in all (shopping, payment and support; admin-bi for delivery managers, finance admins,
+super/ops admins and support agents; vendor; restaurant; delivery for managers and for partners). The customers'
+assistants are read first, and when the panel's status check finds the model unloaded, the caller's own assistants
+first. Ollama (llama.cpp server, one slot) keeps the last start in its slot and saves the others in its RAM prompt
+cache (up to 8 GB), from which a turn restores its assistant's start instead of reading it again. Measured
+2026-11-22: 16,300 tokens in ~6 minutes of CPU after the load (shopping 3,061 tokens / 69 s; payment, support, vendor,
+restaurant 1,600–2,800 / 33–60 s; the other role versions of admin-bi and delivery continue from the previous one, 53–463
+tokens / 3–13 s), 2.0 GB of prompt cache. Afterwards each assistant's first question read only 130–560 new tokens
+(85–95 % restored) and answered in 11–46 s. Ollama answers one request at a time, so the warm-up gives way to what
+people wait for (`ModelActivity`: chat turns that reach the model, insight reports). It starts a read only once nothing
+used the model for `warm-up-quiet` (a read between two model calls of a customer's turn would hold the customer up by
+about a minute), and stops the read in progress as soon as such work begins: it reads through a stream and closes the
+connection, Ollama cancels the read, and llama.cpp ends it after the batch it is on (up to 1,024 tokens, ~20 s on CPU)
+and keeps what it read, so the same start is read again later from there. Measured with a ~2,800-token read stopped
+after 8 s: the next request was answered 9.6 s later instead of waiting ~50 s more. The model load is never stopped
+(the question needs it too). `AI_WARM_UP_AGENTS=shopping` keeps the old behaviour (less memory, a shorter window);
+`AI_WARM_UP=false` turns it off.
 
 Claude (`AI_PROVIDER=anthropic`, the production model since 2026-11-20): `ModelProviderConfig` builds the
 `AnthropicChatModel` from `grocery.ai.anthropic.*` (temperature 0.2, the model timeout, prompt caching of the rules

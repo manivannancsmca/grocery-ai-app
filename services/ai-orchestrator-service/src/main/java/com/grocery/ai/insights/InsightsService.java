@@ -3,6 +3,7 @@ package com.grocery.ai.insights;
 import com.grocery.ai.agent.AgentDefinition;
 import com.grocery.ai.agent.Agents;
 import com.grocery.ai.audit.AiMetrics;
+import com.grocery.ai.model.ModelActivity;
 import com.grocery.ai.model.ModelErrors;
 import com.grocery.ai.chat.ChatSink;
 import com.grocery.ai.chat.ContextBuilder;
@@ -62,9 +63,12 @@ public class InsightsService {
     private final JsonMapper jsonMapper;
     private final AiMetrics metrics;
     private final Clock clock;
+    private final ModelActivity modelActivity;
 
     public InsightsService(Agents agents, ToolGuard guard, ChatClient chatClient, AiProperties properties,
-                           AsyncTaskExecutor aiTaskExecutor, JsonMapper jsonMapper, AiMetrics metrics, Clock clock) {
+                           AsyncTaskExecutor aiTaskExecutor, JsonMapper jsonMapper, AiMetrics metrics, Clock clock,
+                           ModelActivity modelActivity) {
+        this.modelActivity = modelActivity;
         this.agents = agents;
         this.guard = guard;
         this.chatClient = chatClient;
@@ -89,7 +93,8 @@ public class InsightsService {
         InsightReport.Draft draft = null;
         long started = System.nanoTime();
         String outcome = AiMetrics.SUCCESS;                 // grocery_ai_model_latency_seconds{agent,outcome}
-        try {
+        // an admin waits for this: the warm-up stops its read and starts none meanwhile (ModelActivity)
+        try (ModelActivity.Use ignored = modelActivity.begin()) {
             draft = askModel(data);
         } catch (Exception e) {
             outcome = ModelErrors.classify(e);

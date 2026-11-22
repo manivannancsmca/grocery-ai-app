@@ -130,10 +130,22 @@ public record AiProperties(
      *                      Ollama's default of 4096 one search plus one cart change overflowed it, and Ollama then
      *                      dropped the start of the prompt (the rules and tools). The chat also fits the conversation
      *                      history into this window ({@code ChatService}). Costs about 0.6 GB more memory in Ollama.
+     * @param warmUp        load the model and read these assistants' rules and tools before anyone asks
+     *                      ({@code ModelWarmUp}; {@code AI_WARM_UP}, true): when the service starts, and when the
+     *                      assistant panel opens while the model is not loaded (Ollama unloads it after an hour idle)
+     * @param warmUpAgents  the assistants whose starts are read ({@code AI_WARM_UP_AGENTS}, {@code all}: every
+     *                      assistant, the customers' first; or ids such as {@code shopping,admin-bi}). One start per
+     *                      different set of tools an assistant's roles are offered; each costs up to ~70 s of CPU
+     *                      once and ~0.3–0.5 GB of Ollama's RAM prompt cache while the model stays loaded
+     * @param warmUpQuiet   how long no chat turn may have used the model before the next warm-up read (30 s): Ollama
+     *                      answers one request at a time, and a follow-up question should not wait for a read
      */
     public record Ollama(@DefaultValue("http://localhost:11434") String baseUrl,
                          @DefaultValue("qwen3:4b-instruct") String model,
-                         @DefaultValue("8192") int contextTokens) {
+                         @DefaultValue("8192") int contextTokens,
+                         @DefaultValue("true") boolean warmUp,
+                         @DefaultValue("all") java.util.List<String> warmUpAgents,
+                         @DefaultValue("30s") Duration warmUpQuiet) {
     }
 
     /**

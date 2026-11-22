@@ -4,6 +4,7 @@ import com.grocery.ai.SseClient.Result;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import com.grocery.ai.audit.AiMetrics;
+import com.grocery.ai.model.ModelWarmUp;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +43,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "grocery.ai.approvals.pollers-enabled=false",
         "grocery.ai.status-cache-ttl=0s",
         "grocery.ai.model-timeout=5s",
+        // no warm-up in the background (its requests would land among the ones counted here); run on demand below
+        "grocery.ai.ollama.warm-up=false",
+        "grocery.ai.ollama.warm-up-quiet=0s",                  // this test's chats just ended: no waiting (real clock)
         "spring.datasource.hikari.connection-timeout=30000",
         "grocery.events.avro.schema-registry-url=" + AbstractIntegrationTest.SCHEMA_REGISTRY_URL,
         "grocery.events.avro.auto-register-schemas=true"
@@ -71,6 +76,8 @@ class OllamaProviderIntegrationTest {
     AiMetrics metrics;
     @Autowired
     MeterRegistry registry;
+    @Autowired
+    ModelWarmUp warmUp;
 
     /** Phase 13: {@code grocery_ai_model_available{provider="ollama"}}, after a refresh. */
     private double modelAvailable() {
@@ -180,6 +187,46 @@ class OllamaProviderIntegrationTest {
 
     @Test
     @Order(4)
+    void theWarmUpSendsTheStartOfARealCustomersTurnWithTheSameOptions() {
+        // With the real Spring AI client: the warm-up is only worth it when Ollama can reuse what it read, i.e. the
+        // same rules, the same tools and the same load options (num_ctx) as the customer's turn that follows.
+        AbstractIntegrationTest.GATEWAY.reset();
+        AbstractIntegrationTest.GATEWAY.json("GET", "/api/cart", 200, Fixtures.json(Fixtures.defaultCart()));
+        int before = OLLAMA.chatRequests().size();
+        chat(UUID.randomUUID(), "hello");
+        JsonNode real = OLLAMA.chatRequests().get(before);
+        int businessCalls = AbstractIntegrationTest.GATEWAY.requests().size();
+
+        warmUp.warmUp();
+
+        // no tool ran: not a single business API call
+        assertThat(AbstractIntegrationTest.GATEWAY.requests()).hasSize(businessCalls);
+        List<JsonNode> requests = OLLAMA.chatRequests().subList(before + 1, OLLAMA.chatRequests().size());
+        // the load, then every assistant's start (the default "all"), the shopping assistant's first
+        List<ModelWarmUp.Start> starts = warmUp.starts(Set.of());
+        assertThat(starts.getFirst().agent().id()).isEqualTo("shopping");
+        assertThat(requests).hasSize(1 + starts.size());
+        for (int i = 0; i < starts.size(); i++) {
+            assertThat(requests.get(1 + i).get("messages").get(0).get("content").asString())
+                    .isEqualTo(starts.get(i).agent().systemPrompt());
+        }
+        JsonNode load = requests.get(0);                     // "only load": no messages, the chat's window
+        assertThat(load.get("messages").size()).isZero();
+        assertThat(load.get("model").asString()).isEqualTo("qwen3:4b");
+        assertThat(load.get("options").get("num_ctx").asInt()).isEqualTo(8192);
+        JsonNode warm = requests.get(1);
+        assertThat(warm.get("model").asString()).isEqualTo("qwen3:4b");
+        assertThat(warm.get("options").get("num_ctx").asInt()).isEqualTo(8192);
+        assertThat(warm.get("options").get("temperature").asDouble()).isEqualTo(0.2);
+        assertThat(warm.get("options").get("num_predict").asInt()).isEqualTo(1);
+        assertThat(warm.get("think").asBoolean()).isFalse();
+        assertThat(warm.get("messages").get(0)).isEqualTo(real.get("messages").get(0));     // the rules
+        assertThat(warm.get("tools")).isEqualTo(real.get("tools"));                         // the same definitions
+        assertThat(warm.get("messages").get(1).get("content").asString()).isEqualTo("hi");
+    }
+
+    @Test
+    @Order(5)
     void withOllamaGoneTheChatDegradesGracefully() throws Exception {
         OLLAMA.stop();
         AbstractIntegrationTest.GATEWAY.reset();

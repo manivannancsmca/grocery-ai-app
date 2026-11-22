@@ -7,6 +7,7 @@ import com.grocery.ai.audit.AuditLog;
 import com.grocery.ai.config.AiProperties;
 import com.grocery.ai.conversation.ConversationService;
 import com.grocery.ai.gateway.CallContext;
+import com.grocery.ai.model.ModelActivity;
 import com.grocery.ai.model.ModelErrors;
 import com.grocery.ai.model.ModelStatus;
 import com.grocery.ai.tool.ShoppingCommands;
@@ -80,12 +81,15 @@ public class ChatService {
     private final AiMetrics metrics;
     private final Clock clock;
     private final ShoppingCommands shoppingCommands;
+    private final ModelActivity modelActivity;
 
     public ChatService(Agents agents, AuditLog audit, ConversationService conversations, ChatMemory chatMemory,
                        ChatClient chatClient, ToolGuard guard, ContextBuilder contextBuilder, ModelStatus modelStatus,
                        AiProperties properties, AsyncTaskExecutor aiTaskExecutor, JsonMapper jsonMapper,
-                       AiMetrics metrics, Clock clock, ShoppingCommands shoppingCommands) {
+                       AiMetrics metrics, Clock clock, ShoppingCommands shoppingCommands,
+                       ModelActivity modelActivity) {
         this.shoppingCommands = shoppingCommands;
+        this.modelActivity = modelActivity;
         this.agents = agents;
         this.audit = audit;
         this.conversations = conversations;
@@ -162,6 +166,7 @@ public class ChatService {
         String outcome = AiMetrics.SUCCESS;                 // grocery_ai_model_latency_seconds{agent,outcome}
         StringBuilder answer = new StringBuilder();
         ToolTurn toolTurn = ToolTurn.of(user, context, agent, turn.conversationId(), turn.assistantMessageId(), sink);
+        ModelActivity.Use modelUse = null;
         try {
             sink.conversation(turn.conversationId(), agent.id());
             Optional<String> commanded = command(agent, toolTurn, text, history);
@@ -178,6 +183,8 @@ public class ChatService {
                         latency);
                 return;
             }
+            // From here to the end of the turn (all its model calls and the tools between them) the warm-up waits.
+            modelUse = modelActivity.begin();
             String contextLine = contextBuilder.build(agent, user, context);
             List<ToolCallback> tools = guard.callbacks(toolTurn);
             List<Message> fitted = fitHistory(history, tokens(agent.systemPrompt()) + tokens(contextLine)
@@ -248,6 +255,9 @@ public class ChatService {
             }
             sink.error(code, ModelErrors.message(code));
         } finally {
+            if (modelUse != null) {
+                modelUse.close();
+            }
             metrics.modelCall(agent.id(), outcome, System.nanoTime() - started);
             sink.complete();
             MDC.remove(CorrelationId.MDC_KEY);
