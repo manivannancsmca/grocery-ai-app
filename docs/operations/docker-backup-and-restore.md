@@ -30,7 +30,7 @@ command is used.
 
 `grocery-m2` is part of the backup on purpose. It holds the app's own libraries (`grocery-event-schemas`,
 `grocery-common`) and every downloaded dependency, so a restored machine builds without downloading everything again.
-Every service pins the `grocery-event-schemas` version the source code builds (1.7.0), so `build-jars.cmd` can also
+Every service pins the `grocery-event-schemas` version the source code builds (1.8.0), so `build-jars.cmd` can also
 recreate it from the sources when the cache is lost.
 
 ## What a backup contains

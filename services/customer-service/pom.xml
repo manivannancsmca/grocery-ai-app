@@ -19,7 +19,7 @@
     <properties>
         <java.version>25</java.version>
         <grocery-common.version>0.10.1</grocery-common.version>
-        <grocery-event-schemas.version>1.7.0</grocery-event-schemas.version>
+        <grocery-event-schemas.version>1.8.0</grocery-event-schemas.version>
     </properties>
 
     <!-- grocery-common 0.6.0 brings Confluent's Avro serializer, deserializer and Schema Registry client (ADR-0011);

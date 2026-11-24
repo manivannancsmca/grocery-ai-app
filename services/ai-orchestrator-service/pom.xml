@@ -21,7 +21,7 @@
     <properties>
         <java.version>25</java.version>
         <grocery-common.version>0.10.1</grocery-common.version>
-        <grocery-event-schemas.version>1.7.0</grocery-event-schemas.version>
+        <grocery-event-schemas.version>1.8.0</grocery-event-schemas.version>
         <spring-ai.version>2.0.2</spring-ai.version>
         <!-- The OkHttp the OpenTelemetry OTLP exporter (Spring Boot 4.1.2) uses; the Anthropic client shares it. -->
         <okhttp.version>5.3.2</okhttp.version>

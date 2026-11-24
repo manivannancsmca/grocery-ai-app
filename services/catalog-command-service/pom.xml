@@ -19,7 +19,7 @@
     <properties>
         <java.version>25</java.version>
         <grocery-common.version>0.10.1</grocery-common.version>
-        <grocery-event-schemas.version>1.7.0</grocery-event-schemas.version>
+        <grocery-event-schemas.version>1.8.0</grocery-event-schemas.version>
     </properties>
 
     <!-- Confluent's Schema Registry client and Avro serdes (via grocery-common) are not on Maven Central. -->
