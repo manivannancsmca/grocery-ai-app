@@ -90,6 +90,15 @@ using diagrams and short plain-language explanations.
 - [Disaster recovery](operations/disaster-recovery.md): RPO/RTO per failure and the restore procedures for the
   databases, Kafka, Redis, search, the web app, secrets, a Region and Terraform state (Phase 14).
 
+## Guides
+
+Learning material. These explain ideas and possible designs; they do not describe what is built.
+
+- [LLM Gateway explained (in Tamil)](guides/llm-gateway-explained-ta.md): what an LLM gateway is, why
+  ai-orchestrator-service would use one, and how it would work with Ollama, MCP and the app's live-data retrieval
+  (RAG). Includes a worked example (a Diwali sale) with architecture diagrams and example Spring Boot code. Not
+  implemented in the app.
+
 ## Pinned platform versions
 
 | Component | Version |
