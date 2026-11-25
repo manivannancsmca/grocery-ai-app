@@ -12,6 +12,7 @@ never collide and can be repeated.
 | `tests/02-fulfil-deliver-rate.spec.ts` | **Vendor** accepts, packs and marks the order ready on the order board · **partner** goes online (browser geolocation at the store), accepts the offer, switches to the location simulator, picks up, drives towards the customer and delivers · **customer** follows it live (status + live tracking map) and rates the product, the store and the delivery. Three browser contexts side by side. |
 | `tests/03-admin.spec.ts` | **Admin** approves a vendor's application, opens Operations → dead letters, decides an AI approval (a four-eyes *suspend vendor* proposed by an OPS_ADMIN through the scripted assistant) and opens the reports. |
 | `tests/04-assistant.spec.ts` | **Customer assistant** (`AI_PROVIDER=scripted`): "add 2 sona masuri …" fills the cart, "checkout" shows the approval card (nothing placed yet), "Confirm order" places exactly one order. Skipped when the orchestrator runs another model. |
+| `tests/05-layout.spec.ts` | **Layout** (not a journey; a laptop-sized 1350 × 635 window): scrolled to the end of a short and a long admin page, the left menu — collapsed and expanded — still runs from under the top bar to the window's bottom edge, only its links scroll, and the docked "Ask AI" launcher stays below them, uncovered. |
 
 ## Run (Docker only)
 
