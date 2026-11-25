@@ -222,16 +222,24 @@ export function AppLayout() {
           {signedIn && (
             <aside
               className={cn(
-                'hidden shrink-0 border-r border-chrome-edge transition-[width] duration-300 ease-out motion-reduce:transition-none md:block print:hidden!',
-                CHROME_SIDE_BAR,
+                'hidden shrink-0 transition-[width] duration-300 ease-out motion-reduce:transition-none md:block print:hidden!',
                 sidebarCollapsed ? 'w-20' : 'w-64',
               )}
             >
               {/*
-                Sticky, so the menu (longer than a laptop screen) scrolls inside it. z-30 keeps the toggle's outer half
-                above the page next to it.
+                The menu is fixed to the window, from under the top bar (h-16 and its 1px border) to the bottom edge; the
+                aside only keeps its width free next to the page. However long a page is, or whatever on it reaches past
+                its end, the menu never moves or ends early while the page scrolls (as a sticky menu would: it cannot
+                leave its row). Only the list of links scrolls inside it. z-30 keeps the toggle's outer half above the
+                page next to it.
               */}
-              <div className="sticky top-16 z-30 flex h-[calc(100vh-4rem)] flex-col">
+              <div
+                className={cn(
+                  'fixed top-[calc(4rem+1px)] bottom-0 left-0 z-30 flex flex-col border-r border-chrome-edge transition-[width] duration-300 ease-out motion-reduce:transition-none',
+                  CHROME_SIDE_BAR,
+                  sidebarCollapsed ? 'w-20' : 'w-64',
+                )}
+              >
                 {/*
                   The collapse/expand handle sits on the menu's right edge, half outside it, in its own strip at the top
                   (the menu starts below it, so it never covers the workspace card or the current item); it stays put
@@ -251,7 +259,11 @@ export function AppLayout() {
                     className={cn('size-4 transition-transform duration-300 motion-reduce:transition-none', !sidebarCollapsed && 'rotate-180')}
                   />
                 </button>
-                <div id="desktop-navigation" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-11 pb-4">
+                {/*
+                  `relative` makes the list the containing block of the collapsed menu's screen-reader section names
+                  (`sr-only`, absolutely positioned): without it they escape its scroll box and lengthen the page.
+                */}
+                <div id="desktop-navigation" className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-11 pb-4">
                   {area !== 'CUSTOMER' && <AreaBadge area={area} compact={sidebarCollapsed} />}
                   <RoleNav area={area} roles={roles} collapsed={sidebarCollapsed} />
                 </div>
