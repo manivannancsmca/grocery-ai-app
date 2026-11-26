@@ -9,6 +9,7 @@ import { formatDateTime, formatRelativeTime } from '../../shared/utils/format'
 import { AgentSwitcher } from './AgentSwitcher'
 import { AI_LIMITS, type AgentView, type ConversationSummary } from './api'
 import { AnswerLinks } from './AnswerLinks'
+import { AnswerSources } from './AnswerSources'
 import { ApprovalCard } from './ApprovalCard'
 import { FormattedText } from './FormattedText'
 import { useAiStatus, useConversations, useDeleteConversation, useRenameConversation } from './hooks'
@@ -94,6 +95,7 @@ function MessageView({ message, agent, onNavigate, speech }: MessageViewProps) {
             <span>{message.notice.message}</span>
           </p>
         )}
+        {!writing && <AnswerSources sources={message.sources ?? []} />}
         <AnswerLinks links={links} onNavigate={onNavigate} />
         {speech && message.status === 'done' && message.content && <ListenButton messageKey={message.key} text={message.content} speech={speech} />}
         {message.approvals.map((approval) => (

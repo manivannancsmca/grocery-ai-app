@@ -1,5 +1,6 @@
 package com.grocery.ai.tool;
 
+import com.grocery.ai.knowledge.KnowledgeSource;
 import com.grocery.ai.link.PageLink;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -12,12 +13,18 @@ public sealed interface ToolResult {
      * The API answered: {@code result} is what the model gets (trimmed to what it needs; never a top-level
      * {@code status} field, which is reserved for APPROVAL_REQUIRED / BLOCKED / ERROR), {@code summary} is the
      * human-readable line streamed to the UI and audited, {@code links} are the app pages that show the same thing
-     * (buttons under the answer).
+     * (buttons under the answer), {@code sources} the help-center documents it read (shown under the answer).
      */
-    record Ok(ObjectNode result, String summary, int httpStatus, List<PageLink> links) implements ToolResult {
+    record Ok(ObjectNode result, String summary, int httpStatus, List<PageLink> links,
+              List<KnowledgeSource> sources) implements ToolResult {
 
         public Ok {
             links = links == null ? List.of() : List.copyOf(links);
+            sources = sources == null ? List.of() : List.copyOf(sources);
+        }
+
+        public Ok(ObjectNode result, String summary, int httpStatus, List<PageLink> links) {
+            this(result, summary, httpStatus, links, List.of());
         }
     }
 

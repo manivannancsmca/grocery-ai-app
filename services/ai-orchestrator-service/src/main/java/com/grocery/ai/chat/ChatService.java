@@ -7,6 +7,7 @@ import com.grocery.ai.audit.AuditLog;
 import com.grocery.ai.config.AiProperties;
 import com.grocery.ai.conversation.ConversationService;
 import com.grocery.ai.gateway.CallContext;
+import com.grocery.ai.knowledge.KnowledgeSource;
 import com.grocery.ai.model.ModelActivity;
 import com.grocery.ai.model.ModelErrors;
 import com.grocery.ai.model.ModelStatus;
@@ -82,14 +83,19 @@ public class ChatService {
     private final Clock clock;
     private final ShoppingCommands shoppingCommands;
     private final ModelActivity modelActivity;
+    private final KnowledgeAssist knowledge;
+
+    /** The metric outcome of a help-center question answered with the controlled reply (no model call). */
+    static final String KNOWLEDGE_NO_MATCH = "KNOWLEDGE_NO_MATCH";
 
     public ChatService(Agents agents, AuditLog audit, ConversationService conversations, ChatMemory chatMemory,
                        ChatClient chatClient, ToolGuard guard, ContextBuilder contextBuilder, ModelStatus modelStatus,
                        AiProperties properties, AsyncTaskExecutor aiTaskExecutor, JsonMapper jsonMapper,
                        AiMetrics metrics, Clock clock, ShoppingCommands shoppingCommands,
-                       ModelActivity modelActivity) {
+                       ModelActivity modelActivity, KnowledgeAssist knowledge) {
         this.shoppingCommands = shoppingCommands;
         this.modelActivity = modelActivity;
+        this.knowledge = knowledge;
         this.agents = agents;
         this.audit = audit;
         this.conversations = conversations;
@@ -176,7 +182,7 @@ public class ChatService {
                 answer.append(commanded.get());
                 sink.token(commanded.get());
                 int latency = elapsed(started);
-                conversations.finish(turn, user.userId(), answer.toString(), "STOP", latency, false);
+                conversations.finish(turn, user.userId(), answer.toString(), "STOP", latency, false, List.of());
                 remember(turn.conversationId(), text, answer.toString(), toolTurn.toolResults());
                 sink.done(turn.assistantMessageId(), "STOP");
                 log.info("Chat turn {} ({}) answered by a command in {} ms", turn.assistantMessageId(), agent.id(),
@@ -185,20 +191,37 @@ public class ChatService {
             }
             // From here to the end of the turn (all its model calls and the tools between them) the warm-up waits.
             modelUse = modelActivity.begin();
+            // The help center is asked before the model (KnowledgeAssist), and the store rules when asked about.
+            KnowledgeAssist.Lookup lookup = knowledge.lookUp(agent, user, context, text);
+            toolTurn.addKnowledgeSources(lookup.sources());
+            if (lookup.answerWithoutModel()) {
+                // A help-center question the help center cannot answer: the controlled reply, without the model.
+                outcome = KNOWLEDGE_NO_MATCH;
+                answer.append(KnowledgeAssist.NO_VERIFIED_ANSWER);
+                sink.token(KnowledgeAssist.NO_VERIFIED_ANSWER);
+                int latency = elapsed(started);
+                conversations.finish(turn, user.userId(), answer.toString(), "STOP", latency, false, List.of());
+                remember(turn.conversationId(), text, answer.toString(), List.of());
+                sink.done(turn.assistantMessageId(), "STOP");
+                log.info("Chat turn {} ({}): no help-center article, controlled reply in {} ms",
+                        turn.assistantMessageId(), agent.id(), latency);
+                return;
+            }
             String contextLine = contextBuilder.build(agent, user, context);
+            String knowledgeNote = lookup.note();
             List<ToolCallback> tools = guard.callbacks(toolTurn);
             List<Message> fitted = fitHistory(history, tokens(agent.systemPrompt()) + tokens(contextLine)
-                    + tokens(text) + toolTokens(tools), properties.contextTokens());
+                    + tokens(knowledgeNote) + tokens(text) + toolTokens(tools), properties.contextTokens());
             if (fitted.size() < history.size()) {
                 log.info("Chat turn {} ({}): {} of {} remembered messages fit the model's context window",
                         turn.assistantMessageId(), agent.id(), fitted.size(), history.size());
             }
-            List<Message> messages = prompt(agent, fitted, contextLine, text);
+            List<Message> messages = prompt(agent, fitted, contextLine, knowledgeNote, text);
 
             AtomicReference<String> finishReason = new AtomicReference<>();
             stream(messages, tools, toolTurn, sink, answer, finishReason);
             SkippedTools.Reason skipped = toolTurn.toolLimitExceeded().get() ? null
-                    : notBacked(answer.toString(), text, contextLine, fitted, toolTurn);
+                    : notBacked(answer.toString(), text, contextLine, fitted, toolTurn, lookup);
             if (skipped != null) {
                 // Once: the answer claimed a change no tool made, said it could not see data without looking, or
                 // stated figures from nowhere. The client replaces the streamed text (event "retry").
@@ -220,15 +243,17 @@ public class ChatService {
             int latency = elapsed(started);
             String reason = normalize(finishReason.get());
             // Still not backed after the retry: the answer is marked as not checked (stored, shown again on reopening).
-            SkippedTools.Reason still = notBacked(answer.toString(), text, contextLine, fitted, toolTurn);
+            SkippedTools.Reason still = notBacked(answer.toString(), text, contextLine, fitted, toolTurn, lookup);
             boolean unverified = still != null;
+            List<KnowledgeSource> sources = List.copyOf(toolTurn.knowledgeSources());
+            sink.sources(sources);
             if (unverified) {
                 log.warn("Chat turn {} ({}): the answer is still not backed by a tool call ({}); marked unverified",
                         turn.assistantMessageId(), agent.id(), still);
                 metrics.unverifiedAnswer(agent.id());
                 sink.notice(UNVERIFIED_FIGURES, UNVERIFIED_FIGURES_MESSAGE);
             }
-            conversations.finish(turn, user.userId(), answer.toString(), reason, latency, unverified);
+            conversations.finish(turn, user.userId(), answer.toString(), reason, latency, unverified, sources);
             remember(turn.conversationId(), text, answer.toString(), toolTurn.toolResults());
             sink.done(turn.assistantMessageId(), reason);
             log.info("Chat turn {} ({}) answered in {} ms", turn.assistantMessageId(), agent.id(), latency);
@@ -287,10 +312,23 @@ public class ChatService {
      * a customer cannot type something that passes for it.
      */
     static List<Message> prompt(AgentDefinition agent, List<Message> history, String contextLine, String text) {
-        List<Message> messages = new ArrayList<>(history.size() + 3);
+        return prompt(agent, history, contextLine, null, text);
+    }
+
+    /**
+     * As above, with the help-center note ({@link KnowledgeAssist}) right before the new message when there is one: a
+     * message from the app, not a system message (the articles are reference text, not rules), and after the
+     * remembered conversation, so the start of the prompt stays the same and Ollama and Claude keep reusing it.
+     */
+    static List<Message> prompt(AgentDefinition agent, List<Message> history, String contextLine,
+                                String knowledgeNote, String text) {
+        List<Message> messages = new ArrayList<>(history.size() + 4);
         messages.add(new SystemMessage(agent.systemPrompt()));
         messages.addAll(history);
         messages.add(new SystemMessage(contextLine));
+        if (knowledgeNote != null && !knowledgeNote.isBlank()) {
+            messages.add(new UserMessage(knowledgeNote));
+        }
         messages.add(new UserMessage(text));
         return messages;
     }
@@ -342,12 +380,20 @@ public class ChatService {
                 + (results.isEmpty() ? "" : "\nWhat your tools returned in this turn:\n" + String.join("\n", results));
     }
 
-    /** Why the answer is not backed by this turn's tool calls ({@link SkippedTools}), or null. */
+    /**
+     * Why the answer is not backed by this turn's tool calls ({@link SkippedTools}), or null. A help-center lookup
+     * before the model counts as a lookup ("I couldn't find verified information" is then the expected answer, not a
+     * skipped tool), and the articles' text counts as what the model was given: figures from an article pass, figures
+     * from nowhere are still caught.
+     */
     private static SkippedTools.Reason notBacked(String answer, String question, String contextLine,
-                                                 List<Message> history, ToolTurn toolTurn) {
+                                                 List<Message> history, ToolTurn toolTurn,
+                                                 KnowledgeAssist.Lookup lookup) {
+        List<String> sources = sources(question, contextLine, history, toolTurn);
+        sources.add(lookup.articleText());
         // A prepared approval is data too (its title, expiry): such answers were wrongly marked unverified before.
-        return SkippedTools.check(answer, sources(question, contextLine, history, toolTurn),
-                new SkippedTools.Turn(!noToolCalled(toolTurn), toolTurn.changed().get(),
+        return SkippedTools.check(answer, sources,
+                new SkippedTools.Turn(!noToolCalled(toolTurn) || lookup.lookedUp(), toolTurn.changed().get(),
                         !toolTurn.toolResults().isEmpty() || toolTurn.changed().get()));
     }
 

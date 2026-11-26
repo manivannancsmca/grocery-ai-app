@@ -111,6 +111,48 @@ describe('Assistant — chat history from the server', () => {
     expect(within(log).queryByText('Checking that with the app…')).not.toBeInTheDocument()
   })
 
+  it('shows the help-center articles an answer is based on, live and when reopened', async () => {
+    const user = userEvent.setup()
+    customer(SERVER_VOICE, {
+      'GET /ai/conversations': pageOf([conversation('c6', 'refund policy', 1)]),
+      'GET /ai/conversations/:id': {
+        status: 200,
+        data: {
+          id: 'c6',
+          agent: 'shopping',
+          title: 'refund policy',
+          messages: [
+            { id: 'm1', role: 'USER', content: 'refund policy', createdAt: '2026-11-25T09:00:00Z', tools: [], approvals: [] },
+            {
+              id: 'm2',
+              role: 'ASSISTANT',
+              content: 'Paid orders that are cancelled are refunded automatically.',
+              createdAt: '2026-11-25T09:00:04Z',
+              tools: [],
+              approvals: [],
+              sources: [{ documentId: 'd1', title: 'Refund policy', category: 'POLICIES' }],
+            },
+          ],
+        },
+      },
+    })
+    const chat = mockChatStream()
+    renderApp('/orders')
+    const panel = await openPanel(user)
+    const log = within(panel).getByRole('log', { name: 'Conversation' })
+    expect(await within(log).findByText('Refund policy')).toBeInTheDocument()
+    expect(within(log).getByText('From the help center:')).toBeInTheDocument()
+
+    await user.type(input(panel), 'and delivery charges?')
+    await user.click(within(panel).getByRole('button', { name: 'Send' }))
+    const stream = await chat.connection()
+    stream.token('Delivery is charged by distance.')
+    stream.send('sources', { sources: [{ documentId: 'd2', title: 'Delivery charges', category: 'POLICIES' }] })
+    stream.done()
+    expect(await within(log).findByText('Delivery charges')).toBeInTheDocument()
+    expect(within(log).getAllByTestId('answer-sources')).toHaveLength(2)
+  })
+
   it('an answer with figures no tool returned is marked as not checked, live and when reopened', async () => {
     const user = userEvent.setup()
     customer(SERVER_VOICE, {

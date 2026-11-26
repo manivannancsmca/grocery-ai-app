@@ -3,6 +3,7 @@ package com.grocery.ai.tool;
 import com.grocery.ai.agent.AgentDefinition;
 import com.grocery.ai.chat.ChatSink;
 import com.grocery.ai.gateway.CallContext;
+import com.grocery.ai.knowledge.KnowledgeSource;
 import com.grocery.common.security.CurrentUser;
 
 import java.util.List;
@@ -22,10 +23,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *                       grounding check of the answer; never stored
  * @param changed        a tool that changes something (a cart change, or a sensitive tool's approval request) ran in
  *                       this turn: an answer saying "added" or "prepared" is backed by it ({@code SkippedTools})
+ * @param knowledgeSources the help-center documents read in this turn (before the model, or by searchHelpCenter),
+ *                       once each: shown under the answer and stored with it
  */
 public record ToolTurn(CurrentUser user, CallContext http, AgentDefinition agent, UUID conversationId,
                        UUID messageId, ChatSink sink, AtomicBoolean toolLimitExceeded,
-                       List<String> toolResults, List<String> toolResponses, AtomicBoolean changed) {
+                       List<String> toolResults, List<String> toolResponses, AtomicBoolean changed,
+                       List<KnowledgeSource> knowledgeSources) {
 
     /** Per result: enough for ids, names and prices of a short list, not whole API answers. */
     static final int RESULT_LIMIT = 900;
@@ -33,7 +37,17 @@ public record ToolTurn(CurrentUser user, CallContext http, AgentDefinition agent
     public static ToolTurn of(CurrentUser user, CallContext http, AgentDefinition agent, UUID conversationId,
                               UUID messageId, ChatSink sink) {
         return new ToolTurn(user, http, agent, conversationId, messageId, sink, new AtomicBoolean(),
-                new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(), new AtomicBoolean());
+                new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(), new AtomicBoolean(),
+                new CopyOnWriteArrayList<>());
+    }
+
+    /** Adds help-center documents this turn read (each document once, in the order first read). */
+    public synchronized void addKnowledgeSources(List<KnowledgeSource> sources) {
+        for (KnowledgeSource source : sources) {
+            if (knowledgeSources.stream().noneMatch(known -> known.documentId().equals(source.documentId()))) {
+                knowledgeSources.add(source);
+            }
+        }
     }
 
     /** Records what a successful READ / LOW_RISK_WRITE call returned (trimmed). */

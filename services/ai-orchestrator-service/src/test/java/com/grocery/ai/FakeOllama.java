@@ -14,8 +14,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 
 /**
- * Speaks Ollama's HTTP API ({@code GET /api/tags}, {@code POST /api/chat} streamed as NDJSON or not) so the real
- * Spring AI Ollama client and chat model run in the tests. Script: a request that offers tools and asks about the
+ * Speaks Ollama's HTTP API ({@code GET /api/tags}, {@code POST /api/chat} streamed as NDJSON or not,
+ * {@code POST /api/embed}) so the real Spring AI Ollama client, chat model and embedding model run in the tests. Script: a request that offers tools and asks about the
  * cart gets a {@code getCart} tool call (without an id, as older Ollama versions send it); a request carrying a tool
  * result gets the answer in two chunks; a non-streamed request with a {@code format} schema gets an insight report.
  */
@@ -25,7 +25,14 @@ public final class FakeOllama {
 
     private final HttpServer server;
     private final List<JsonNode> chatRequests = new CopyOnWriteArrayList<>();
+    private final List<String> embeddedTexts = new CopyOnWriteArrayList<>();
     private volatile String pulledModel = "qwen3:4b";
+    private volatile int embeddingDimensions = EMBEDDING_DIMENSIONS;
+    /** 0 = answer; otherwise the HTTP status every embedding request gets (404 = model not installed). */
+    private volatile int embeddingFailure;
+
+    /** Length of the fake embedding vectors (tests set grocery.ai.knowledge.embedding.dimensions to it). */
+    public static final int EMBEDDING_DIMENSIONS = 64;
 
     public FakeOllama() {
         try {
@@ -36,7 +43,89 @@ public final class FakeOllama {
         server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/api/tags", this::tags);
         server.createContext("/api/chat", this::chat);
+        server.createContext("/api/embed", this::embed);
         server.start();
+    }
+
+    /** Every text embedded so far (with its task prefix). */
+    public List<String> embeddedTexts() {
+        return List.copyOf(embeddedTexts);
+    }
+
+    public void failEmbeddings(int httpStatus) {
+        embeddingFailure = httpStatus;
+    }
+
+    public void embeddingDimensions(int dimensions) {
+        embeddingDimensions = dimensions;
+    }
+
+    public void resetEmbeddings() {
+        embeddingFailure = 0;
+        embeddingDimensions = EMBEDDING_DIMENSIONS;
+        embeddedTexts.clear();
+    }
+
+    /**
+     * {@code POST /api/embed}: a bag-of-words vector per input (each word, without a trailing "s", adds 1 at a
+     * position given by its hash; then normalised), so texts sharing words are similar and others are not, as with a
+     * real model. The task prefixes ("search_document: ", "search_query: ") and a few filler words are ignored.
+     */
+    private void embed(HttpExchange exchange) throws IOException {
+        JsonNode request = JSON.readTree(exchange.getRequestBody().readAllBytes());
+        if (embeddingFailure != 0) {
+            byte[] error = ("{\"error\":\"model \\\"" + request.path("model").asString() + "\\\" not found, try "
+                    + "pulling it first\"}").getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(embeddingFailure, error.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(error);
+            }
+            return;
+        }
+        JsonNode input = request.get("input");
+        List<String> texts = input.isArray() ? input.valueStream().map(JsonNode::asString).toList()
+                : List.of(input.asString());
+        embeddedTexts.addAll(texts);
+        StringBuilder embeddings = new StringBuilder("[");
+        for (String text : texts) {
+            if (embeddings.length() > 1) {
+                embeddings.append(',');
+            }
+            embeddings.append(JSON.writeValueAsString(bagOfWords(text, embeddingDimensions)));
+        }
+        embeddings.append(']');
+        send(exchange, "application/json", "{\"model\":\"" + request.path("model").asString()
+                + "\",\"embeddings\":" + embeddings + ",\"total_duration\":1000,\"load_duration\":10,"
+                + "\"prompt_eval_count\":" + texts.size() + "}");
+    }
+
+    private static final java.util.Set<String> FILLER = java.util.Set.of("the", "a", "an", "is", "are", "to", "of",
+            "and", "or", "in", "on", "for", "your", "you", "my", "i", "me", "we", "our", "what", "how", "can", "do",
+            "does", "it", "be", "with", "search_document", "search_query");
+
+    static float[] bagOfWords(String text, int dimensions) {
+        float[] vector = new float[dimensions];
+        for (String word : text.toLowerCase().split("[^\\p{L}\\p{N}_]+")) {
+            if (word.isEmpty() || FILLER.contains(word)) {
+                continue;
+            }
+            String stem = word.length() > 3 && word.endsWith("s") ? word.substring(0, word.length() - 1) : word;
+            vector[Math.floorMod(stem.hashCode(), dimensions)] += 1;
+        }
+        double norm = 0;
+        for (float value : vector) {
+            norm += value * value;
+        }
+        if (norm == 0) {
+            vector[0] = 1;                       // never a zero vector (cosine needs a length)
+            return vector;
+        }
+        float length = (float) Math.sqrt(norm);
+        for (int i = 0; i < vector.length; i++) {
+            vector[i] /= length;
+        }
+        return vector;
     }
 
     public String baseUrl() {

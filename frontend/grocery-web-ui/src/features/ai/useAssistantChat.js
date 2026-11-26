@@ -9,6 +9,7 @@ import { CART_WRITE_TOOLS } from './labels'
 
 /** @typedef {import('./api').ApprovalView} ApprovalView */
 /** @typedef {import('./api').ConversationMessage} ConversationMessage */
+/** @typedef {import('./api').KnowledgeSource} KnowledgeSource */
 /** @typedef {import('./api').ToolActivity} ToolActivity */
 
 /**
@@ -28,6 +29,7 @@ import { CART_WRITE_TOOLS } from './labels'
  * @property {boolean} [spoken] A question asked by voice in this session (its answer is read aloud when it is complete).
  * @property {{ code: string, message: string } | null} [notice] An answer stating figures that no tool returned: shown as not checked against the app's data.
  * @property {string | null} [checking] The streamed text was dropped and the answer is being checked again (live `retry` event), until new text comes.
+ * @property {KnowledgeSource[]} [sources] The help-center documents the answer was given (shown under it once complete).
  */
 
 /**
@@ -148,6 +150,7 @@ function fromHistory(message) {
     status: 'done',
     error: null,
     notice: message.unverified ? { code: 'UNVERIFIED_FIGURES', message: UNVERIFIED_ANSWER_MESSAGE } : null,
+    sources: message.sources ?? [],
   }
 }
 
@@ -253,6 +256,9 @@ export function useAssistantChat(agent, options = {}) {
             // The answer so far did not use the app's data although it had to: it is replaced by the next one.
             answerText = ''
             update((answer) => ({ ...answer, content: '', notice: null, checking: event.message }))
+            return
+          case 'sources':
+            update((answer) => ({ ...answer, sources: event.sources }))
             return
         }
       }

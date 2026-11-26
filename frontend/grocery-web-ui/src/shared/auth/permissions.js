@@ -41,6 +41,8 @@ export const PERMISSIONS = {
   'settings.view': ['SUPER_ADMIN', 'OPS_ADMIN', 'FINANCE_ADMIN', 'SUPPORT', 'DELIVERY_MANAGER'],
   /** PUT /api/admin/settings/{area} */
   'settings.manage': ['SUPER_ADMIN', 'OPS_ADMIN'],
+  /** Upload, replace, reindex and delete help-center documents (/api/admin/ai/knowledge; every admin may look). */
+  'knowledge.manage': ['SUPER_ADMIN', 'OPS_ADMIN'],
 }
 
 /** @typedef {keyof typeof PERMISSIONS} Permission */

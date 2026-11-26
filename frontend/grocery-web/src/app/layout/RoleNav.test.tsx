@@ -50,6 +50,7 @@ describe('RoleNav', () => {
       const nav = renderNav('ADMIN', [role])
       expect(within(nav).getByRole('link', { name: 'AI approvals' })).toHaveAttribute('href', '/admin/ai/approvals')
       expect(within(nav).getByRole('link', { name: 'AI audit' })).toHaveAttribute('href', '/admin/ai/audit')
+      expect(within(nav).getByRole('link', { name: 'Help center' })).toHaveAttribute('href', '/admin/ai/knowledge')
       expect(within(nav).getByRole('link', { name: 'Approvals' })).toHaveAttribute('href', '/admin/approvals')
       cleanup()
     }

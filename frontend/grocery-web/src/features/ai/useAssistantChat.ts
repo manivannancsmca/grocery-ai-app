@@ -2,7 +2,15 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, errorMessage, hasErrorCode, problemNumber } from '../../shared/api/problemDetail'
 import { cartKeys } from '../cart/api'
-import { AI_ERRORS, aiKeys, type ApprovalView, type ConversationMessage, fetchConversation, type ToolActivity } from './api'
+import {
+  AI_ERRORS,
+  aiKeys,
+  type ApprovalView,
+  type ConversationMessage,
+  fetchConversation,
+  type KnowledgeSource,
+  type ToolActivity,
+} from './api'
 import { type ChatStreamEvent, streamChat, UNVERIFIED_ANSWER_MESSAGE } from './chatStream'
 import { storeApproval } from './hooks'
 import { CART_WRITE_TOOLS } from './labels'
@@ -25,6 +33,8 @@ export interface ChatMessage {
   notice?: { code: string; message: string } | null
   /** The streamed text was dropped and the answer is being checked again (live `retry` event), until new text comes. */
   checking?: string | null
+  /** The help-center documents the answer was given (shown under it once complete). */
+  sources?: KnowledgeSource[]
 }
 
 export interface SendOptions {
@@ -108,6 +118,7 @@ function fromHistory(message: ConversationMessage): ChatMessage {
     status: 'done',
     error: null,
     notice: message.unverified ? { code: 'UNVERIFIED_FIGURES', message: UNVERIFIED_ANSWER_MESSAGE } : null,
+    sources: message.sources ?? [],
   }
 }
 
@@ -201,6 +212,9 @@ export function useAssistantChat(agent: string, options: AssistantChatOptions = 
             // The answer so far did not use the app's data although it had to: it is replaced by the next one.
             answerText = ''
             update((answer) => ({ ...answer, content: '', notice: null, checking: event.message }))
+            return
+          case 'sources':
+            update((answer) => ({ ...answer, sources: event.sources }))
             return
         }
       }

@@ -892,6 +892,8 @@ class GatewayRoutingIntegrationTest {
         assertRouted(HttpMethod.GET, "/api/vendor/products", vendor, "CATALOG_COMMAND", "/api/vendor/products");
         assertRouted(HttpMethod.GET, "/api/vendor/inventory", vendor, "INVENTORY", "/api/vendor/inventory");
         assertRouted(HttpMethod.GET, "/api/vendor/prices", vendor, "PRICING", "/api/vendor/prices");
+        // the fees in force, for the assistants' getStoreRules tool (any signed-in user)
+        assertRouted(HttpMethod.GET, "/api/pricing/delivery-fees", vendor, "PRICING", "/api/pricing/delivery-fees");
         assertRouted(HttpMethod.GET, "/api/vendor/orders", vendor, "VENDOR", "/api/vendor/orders");
         assertRouted(HttpMethod.GET, "/api/vendor/reports/sales", vendor, "VENDOR", "/api/vendor/reports/sales");
         assertRejected(HttpMethod.GET, "/api/vendor/suppliers", null, 401);

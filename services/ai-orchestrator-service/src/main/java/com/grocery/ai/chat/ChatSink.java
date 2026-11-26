@@ -1,8 +1,10 @@
 package com.grocery.ai.chat;
 
 import com.grocery.ai.approval.ApprovalView;
+import com.grocery.ai.knowledge.KnowledgeSource;
 import com.grocery.ai.tool.ToolActivity;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Where a turn's stream events go (contract §2 "Stream events"); a no-op for server-side tool use (insights). */
@@ -33,6 +35,14 @@ public interface ChatSink {
      * new answer's tokens follow.
      */
     default void retry(String code, String message) {
+    }
+
+    /**
+     * The help-center documents the answer was given (knowledge base, docs/rag/RAG-MCP-INTEGRATION.md), sent just
+     * before {@code done}: the client shows them under the answer ("From the help center: Refund policy"). Clients
+     * that do not know the event ignore it.
+     */
+    default void sources(List<KnowledgeSource> sources) {
     }
 
     /** The client went away: stop producing. */

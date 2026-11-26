@@ -8,6 +8,7 @@ import { toPageLinks } from './pageLinks'
 /** @typedef {import('../../shared/api/problemDetail').ProblemDetail} ProblemDetail */
 /** @typedef {import('../../shared/realtime/sseParser').SseEvent} SseEvent */
 /** @typedef {import('./api').ApprovalView} ApprovalView */
+/** @typedef {import('./api').KnowledgeSource} KnowledgeSource */
 /** @typedef {import('./api').ToolActivity} ToolActivity */
 
 /**
@@ -32,6 +33,7 @@ import { toPageLinks } from './pageLinks'
  *   | { type: 'error', code: string, message: string }
  *   | { type: 'notice', code: string, message: string }
  *   | { type: 'retry', code: string, message: string }
+ *   | { type: 'sources', sources: KnowledgeSource[] }
  * )} ChatStreamEvent
  */
 
@@ -159,9 +161,28 @@ export function parseChatEvent(event) {
     }
     case 'retry':
       return { type: 'retry', code: text(raw.code) ?? 'RETRY', message: text(raw.message) ?? RETRY_MESSAGE }
+    case 'sources': {
+      const sources = toSources(raw.sources)
+      return sources.length > 0 ? { type: 'sources', sources } : null
+    }
     default:
       return null
   }
+}
+
+/**
+ * The well-formed entries of a `sources` list (others are left out).
+ * @param {unknown} value
+ * @returns {KnowledgeSource[]}
+ */
+export function toSources(value) {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null) return []
+    const documentId = text(entry.documentId)
+    const title = text(entry.title)
+    return documentId && title ? [{ documentId, title, category: text(entry.category) ?? '' }] : []
+  })
 }
 
 /**

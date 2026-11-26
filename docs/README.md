@@ -37,6 +37,22 @@ using diagrams and short plain-language explanations.
 | [0012](adr/0012-aws-ecs-fargate-deployment.md) | AWS deployment: ECS Fargate, managed data services, native blue/green, Jenkins and Terraform |
 | [0013](adr/0013-observability-opentelemetry.md) | Observability with Micrometer and OpenTelemetry through a collector (Grafana stack locally, AWS managed in AWS) |
 | [0014](adr/0014-kubernetes-path.md) | When and how to move from ECS to Kubernetes (EKS) |
+| [0015](adr/0015-knowledge-base-in-elasticsearch.md) | The assistants' knowledge base (RAG) in ai-orchestrator-service's own Elasticsearch index; Ollama / Bedrock embeddings |
+
+## Knowledge base (RAG): the assistants' help center
+
+The assistants answer policy and how-to questions from help-center articles admins upload, with the source shown;
+live data still comes only from the business APIs.
+
+- [Architecture](rag/RAG-ARCHITECTURE.md): components, request flow, data model, routing, preventing made-up answers.
+- [Implementation guide](rag/RAG-IMPLEMENTATION-GUIDE.md): a code tour and common changes.
+- [Document ingestion](rag/RAG-DOCUMENT-INGESTION.md): validation, extraction, chunking, embeddings, versions,
+  failures, writing good articles.
+- [RAG and MCP / tools](rag/RAG-MCP-INTEGRATION.md): routing between the help center and live data, with examples.
+- [API reference](rag/RAG-API-REFERENCE.md): the admin API, the `sources` chat event, the new tools.
+- [Setup](rag/RAG-LOCAL-SETUP.md): Docker, host-run, models, checks, and the one-time AWS steps.
+- [Troubleshooting](rag/RAG-TROUBLESHOOTING.md): metrics, alerts, common problems.
+- [Testing and evaluation](rag/RAG-TESTING-GUIDE.md): the test layers and the quality evaluation with its results.
 
 ## Events
 

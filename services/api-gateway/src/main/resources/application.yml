@@ -200,7 +200,9 @@ spring:
             - id: pricing
               uri: ${PRICING_SERVICE_URL:http://localhost:8108}
               predicates:
-                - Path=/api/vendor/prices,/api/vendor/prices/**,/api/vendor/price-change-requests,/api/vendor/price-change-requests/**,/api/admin/price-change-requests,/api/admin/price-change-requests/**,/api/admin/pricing/**
+                # /api/pricing/delivery-fees: the delivery fees and minimum order in force (any signed-in user; the
+                # assistants' getStoreRules tool)
+                - Path=/api/vendor/prices,/api/vendor/prices/**,/api/vendor/price-change-requests,/api/vendor/price-change-requests/**,/api/admin/price-change-requests,/api/admin/price-change-requests/**,/api/admin/pricing/**,/api/pricing/delivery-fees
               filters: *api-rate-limit
             # ---------------- cart & checkout preview (Phase 5)
             - id: cart

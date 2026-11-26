@@ -67,6 +67,7 @@ module "platform" {
   ollama_base_url       = var.ollama_base_url
   ollama_model          = var.ollama_model
   anthropic_model       = var.anthropic_model
+  ai_knowledge_enabled  = var.ai_knowledge_enabled
   mail_enabled          = var.mail_enabled
   smtp_host             = var.smtp_host
 }

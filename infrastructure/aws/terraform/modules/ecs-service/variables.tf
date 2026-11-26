@@ -263,6 +263,12 @@ variable "exec_kms_key_arn" {
   default     = null
 }
 
+variable "bedrock_model_arns" {
+  description = "Amazon Bedrock foundation models the application may invoke (ai-orchestrator-service's knowledge base embeddings); none by default."
+  type        = list(string)
+  default     = []
+}
+
 variable "log_retention_days" {
   description = "Retention of /grocery/<env>/<name>."
   type        = number

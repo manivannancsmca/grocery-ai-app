@@ -31,6 +31,12 @@
 #   AI_MODEL_TIMEOUT                              tunable (task definition, from services.auto.tfvars.json)
 #   AI_VOICE_MODE (off), AI_VOICE_BASE_URL        voice chat: server | browser | off; the OpenAI-compatible audio API
 #   AI_VOICE_API_KEY                              secret grocery/<env>/ai-orchestrator-service/voice-api-key (server)
+#   AI_KNOWLEDGE_ENABLED (false)                  the knowledge base (RAG, docs/rag/RAG-LOCAL-SETUP.md "AWS")
+#   ELASTICSEARCH_URIS                            Elastic Cloud endpoint (its own index, ADR-0015)
+#   ELASTICSEARCH_API_KEY                         secret grocery/<env>/ai-orchestrator-service/elasticsearch (api_key):
+#                                                 an API key limited to the grocery-knowledge* indexes
+#   AI_EMBEDDING_PROVIDER (bedrock), AI_EMBEDDING_MODEL (amazon.titan-embed-text-v2:0), AI_EMBEDDING_DIMENSIONS (1024)
+#                                                 Bedrock with the task role (bedrock:InvokeModel on that model)
 # Run it locally against the docker stack ("aws-like"): infrastructure/ci/README.md, "application-aws.yml".
 # =====================================================================================================================
 spring:
@@ -47,6 +53,9 @@ spring:
         jwt:   # zero trust: every service validates the JWT itself (identity JWKS, issuer, audience)
           jwk-set-uri: ${IDENTITY_JWKS_URI:http://identity-service:8101/.well-known/jwks.json}
           issuer-uri: ${JWT_ISSUER}
+  elasticsearch:   # the knowledge base's own index (only used with AI_KNOWLEDGE_ENABLED=true)
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    api-key: ${ELASTICSEARCH_API_KEY:}   # "Authorization: ApiKey ..." on every request when set
 
 grocery:
   ai:
@@ -59,6 +68,22 @@ grocery:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     approvals:
       signing-key: ${AI_APPROVAL_SIGNING_KEY}   # required: every replica signs/verifies with the same key
+    # The knowledge base in AWS: Claude has no embeddings, so Amazon Titan Text Embeddings V2 through Bedrock (the
+    # task role's credentials, the task's region). Titan takes no task prefixes. Off until the operator created the
+    # Elasticsearch API key and enabled the model in Bedrock (docs/rag/RAG-LOCAL-SETUP.md, "AWS").
+    knowledge:
+      enabled: ${AI_KNOWLEDGE_ENABLED:false}
+      embedding:
+        provider: ${AI_EMBEDDING_PROVIDER:bedrock}
+        model: ${AI_EMBEDDING_MODEL:amazon.titan-embed-text-v2:0}
+        dimensions: ${AI_EMBEDDING_DIMENSIONS:1024}
+        document-prefix: ""
+        query-prefix: ""
+      # The retrieval thresholds (application.yml: AI_KNOWLEDGE_SIMILARITY_THRESHOLD, AI_KNOWLEDGE_UNRECOGNISED_THRESHOLD)
+      # were calibrated for nomic-embed-text. Titan scores differently (usually lower: then more "couldn't find"
+      # replies, never more invented ones): calibrate them for Titan before relying on them (docs/rag/RAG-TESTING-GUIDE.md).
+      seed:
+        enabled: false
     voice:
       # Off until the operator chooses where speech is processed: server (AI_VOICE_BASE_URL + AI_VOICE_API_KEY from
       # Secrets Manager) or browser (the browser's own speech features).

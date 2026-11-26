@@ -50,6 +50,7 @@ DEFAULTS = {
     "ai_provider": "<tf:var.ai_provider>",
     "ollama_model": "<tf:var.ollama_model>",
     "anthropic_model": "<tf:var.anthropic_model>",
+    "ai_knowledge_enabled": "<tf:var.ai_knowledge_enabled>",
     "bootstrap_admin_email": "<tf:var.bootstrap_admin_email>",
     "mail_enabled": "<tf:var.mail_enabled>",
 }
@@ -188,6 +189,7 @@ def render_template(args, catalog, tfvars):
         "{{ollama_base_url}}": tfvars.get("ollama_base_url", ""),
         "{{ollama_model}}": tv("ollama_model"),
         "{{anthropic_model}}": tv("anthropic_model"),
+        "{{ai_knowledge_enabled}}": str(tv("ai_knowledge_enabled")).lower(),
         "{{mail_enabled}}": tv("mail_enabled"),
         "{{smtp_host}}": tfvars.get("smtp_host", "email-smtp.%s.amazonaws.com" % region),
         "{{kafka_bootstrap_scram}}": "<tf:module.msk.bootstrap_brokers_scram>",

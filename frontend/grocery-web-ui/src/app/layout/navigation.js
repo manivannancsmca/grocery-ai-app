@@ -110,6 +110,7 @@ export const NAVIGATION = {
     // Phase 11 (the onboarding queue above is "Approvals").
     { label: 'AI approvals', to: '/admin/ai/approvals', icon: 'sparkleQuestion', section: 'Operations' },
     { label: 'AI audit', to: '/admin/ai/audit', icon: 'sparkleCheck', section: 'Operations' },
+    { label: 'Help center', to: '/admin/ai/knowledge', icon: 'menuBook', section: 'Operations' },
     { label: 'Operations', to: '/admin/operations', icon: 'settings', section: 'Operations' },
     { label: 'Email log', to: '/admin/emails', icon: 'mail', section: 'Operations' },
     // Business rules admins may change without a release (every admin may look; two roles may change them).

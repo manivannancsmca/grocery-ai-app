@@ -1,6 +1,7 @@
 package com.grocery.ai.chat;
 
 import com.grocery.ai.approval.ApprovalView;
+import com.grocery.ai.knowledge.KnowledgeSource;
 import com.grocery.ai.tool.ToolActivity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -86,6 +88,13 @@ public class SseChatSink implements ChatSink {
         data.put("code", code);
         data.put("message", message);
         send("retry", data);
+    }
+
+    @Override
+    public void sources(List<KnowledgeSource> sources) {
+        if (!sources.isEmpty()) {
+            send("sources", Map.of("sources", sources));
+        }
     }
 
     @Override

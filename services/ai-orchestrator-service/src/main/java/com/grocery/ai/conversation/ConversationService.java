@@ -7,6 +7,7 @@ import com.grocery.ai.approval.ApprovalView;
 import com.grocery.ai.audit.ToolInvocation;
 import com.grocery.ai.audit.ToolInvocationRepository;
 import com.grocery.ai.chat.ChatException;
+import com.grocery.ai.knowledge.KnowledgeSource;
 import com.grocery.ai.link.PageLink;
 import com.grocery.ai.tool.ToolActivity;
 import com.grocery.ai.tool.ToolSpec;
@@ -71,9 +72,13 @@ public class ConversationService {
     public record ConversationSummary(UUID id, String agent, String title, Instant createdAt, Instant updatedAt) {
     }
 
-    /** {@code unverified}: an answer stating figures that no tool returned (shown as not checked against live data). */
+    /**
+     * {@code unverified}: an answer stating figures that no tool returned (shown as not checked against live data);
+     * {@code sources}: the help-center documents the answer was given (empty for none).
+     */
     public record MessageView(UUID id, AiMessage.Role role, String content, Instant createdAt,
-                              List<ToolActivity> tools, List<ApprovalView> approvals, boolean unverified) {
+                              List<ToolActivity> tools, List<ApprovalView> approvals, boolean unverified,
+                              List<KnowledgeSource> sources) {
     }
 
     public record ConversationView(UUID id, String agent, String title, List<MessageView> messages) {
@@ -114,15 +119,21 @@ public class ConversationService {
         });
     }
 
-    /** The answer was streamed completely ({@code unverifiedFigures}: it states figures no tool returned). */
+    /**
+     * The answer was streamed completely ({@code unverifiedFigures}: it states figures no tool returned;
+     * {@code sources}: the help-center documents it was given).
+     */
     public void finish(Turn turn, UUID userId, String answer, String finishReason, int latencyMs,
-                       boolean unverifiedFigures) {
+                       boolean unverifiedFigures, List<KnowledgeSource> sources) {
         transaction.executeWithoutResult(status -> {
             Instant now = clock.instant();
             AiMessage message = new AiMessage(turn.assistantMessageId(), turn.conversationId(), userId,
                     AiMessage.Role.ASSISTANT, answer, finishReason, null, latencyMs, now);
             if (unverifiedFigures) {
                 message.markUnverifiedFigures();
+            }
+            if (!sources.isEmpty()) {
+                message.setSources(jsonMapper.writeValueAsString(sources));
             }
             messages.save(message);
             conversations.findById(turn.conversationId()).ifPresent(c -> c.touch(now));
@@ -170,8 +181,21 @@ public class ConversationService {
         List<MessageView> views = transcript.stream().map(m -> new MessageView(m.getId(), m.getRole(),
                 m.getContent(), m.getCreatedAt(),
                 toolsByMessage.getOrDefault(m.getId(), List.of()).stream().map(i -> activity(agent, i)).toList(),
-                approvalsByMessage.getOrDefault(m.getId(), List.of()), m.hasUnverifiedFigures())).toList();
+                approvalsByMessage.getOrDefault(m.getId(), List.of()), m.hasUnverifiedFigures(),
+                sources(m.getSources()))).toList();
         return new ConversationView(conversation.getId(), conversation.getAgent(), conversation.getTitle(), views);
+    }
+
+    /** The stored help-center sources of an answer; none when absent or unreadable. */
+    private List<KnowledgeSource> sources(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return List.of(jsonMapper.readValue(json, KnowledgeSource[].class));
+        } catch (RuntimeException unreadable) {
+            return List.of();
+        }
     }
 
     /**

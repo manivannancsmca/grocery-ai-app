@@ -242,6 +242,7 @@ public class ToolGuard {
             return switch (spec.executor().execute(call)) {
                 case ToolResult.Ok ok -> {
                     turn.rememberResult(toolName, ok.result() == null ? null : ok.result().toString());
+                    turn.addKnowledgeSources(ok.sources());
                     yield new Decision(InvocationStatus.SUCCEEDED, null, ok.summary(), ok.httpStatus(), null,
                             ok.result(), ok.links()).via(call.transport());
                 }

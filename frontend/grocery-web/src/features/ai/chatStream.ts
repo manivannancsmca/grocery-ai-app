@@ -2,7 +2,7 @@ import { CORRELATION_ID_HEADER, newCorrelationId } from '../../shared/api/correl
 import { ApiError, isProblemDetail, type ProblemDetail } from '../../shared/api/problemDetail'
 import { getAccessToken, markSuspended, refreshSession } from '../../shared/auth/session'
 import { createSseParser, type SseEvent } from '../../shared/realtime/sseParser'
-import { type ApprovalView, chatUrl, type ToolActivity } from './api'
+import { type ApprovalView, chatUrl, type KnowledgeSource, type ToolActivity } from './api'
 import { toPageLinks } from './pageLinks'
 
 /**
@@ -31,6 +31,8 @@ export type ChatStreamEvent =
    * `UNSEEN` or `FIGURES`) and is asked once more. The new answer's events follow.
    */
   | { type: 'retry'; code: string; message: string }
+  /** The help-center documents the answer was given (sent just before `done`); shown under the answer. */
+  | { type: 'sources'; sources: KnowledgeSource[] }
 
 /**
  * How the turn ended: `done` / `error` (the server's last event), `aborted` (cancelled here) or `interrupted`
@@ -134,9 +136,25 @@ export function parseChatEvent(event: SseEvent): ChatStreamEvent | null {
     }
     case 'retry':
       return { type: 'retry', code: text(raw.code) ?? 'RETRY', message: text(raw.message) ?? RETRY_MESSAGE }
+    case 'sources': {
+      const sources = toSources(raw.sources)
+      return sources.length > 0 ? { type: 'sources', sources } : null
+    }
     default:
       return null
   }
+}
+
+/** The well-formed entries of a `sources` list (others are left out). */
+export function toSources(value: unknown): KnowledgeSource[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null) return []
+    const raw = entry as Record<string, unknown>
+    const documentId = text(raw.documentId)
+    const title = text(raw.title)
+    return documentId && title ? [{ documentId, title, category: text(raw.category) ?? '' }] : []
+  })
 }
 
 function isAbort(error: unknown): boolean {

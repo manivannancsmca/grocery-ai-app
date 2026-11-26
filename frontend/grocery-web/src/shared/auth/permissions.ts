@@ -43,6 +43,8 @@ export const PERMISSIONS = {
   'settings.view': ['SUPER_ADMIN', 'OPS_ADMIN', 'FINANCE_ADMIN', 'SUPPORT', 'DELIVERY_MANAGER'],
   /** PUT /api/admin/settings/{area} */
   'settings.manage': ['SUPER_ADMIN', 'OPS_ADMIN'],
+  /** Upload, replace, reindex and delete help-center documents (/api/admin/ai/knowledge; every admin may look). */
+  'knowledge.manage': ['SUPER_ADMIN', 'OPS_ADMIN'],
   /** GET /api/admin/audit (the central audit trail: it has sign-in addresses and e-mails) */
   'audit.view': ['SUPER_ADMIN', 'OPS_ADMIN'],
 } as const satisfies Record<string, readonly AdminRole[]>
