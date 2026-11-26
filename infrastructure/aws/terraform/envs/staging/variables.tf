@@ -298,6 +298,12 @@ variable "anthropic_model" {
   default     = "claude-opus-5-5"
 }
 
+variable "ai_knowledge_enabled" {
+  description = "AI_KNOWLEDGE_ENABLED: the knowledge base (RAG). On once the Elasticsearch API key and Bedrock access exist (docs/rag/RAG-LOCAL-SETUP.md)."
+  type        = bool
+  default     = false
+}
+
 variable "ollama_base_url" {
   description = "OLLAMA_BASE_URL (null = no model endpoint)."
   type        = string

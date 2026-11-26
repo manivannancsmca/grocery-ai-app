@@ -67,6 +67,7 @@ locals {
     ollama_base_url          = var.ollama_base_url == null ? "" : var.ollama_base_url
     ollama_model             = var.ollama_model
     anthropic_model          = var.anthropic_model
+    ai_knowledge_enabled     = tostring(var.ai_knowledge_enabled)
     mail_enabled             = tostring(var.mail_enabled)
     smtp_host                = local.smtp_host
     kafka_bootstrap_scram    = module.msk.bootstrap_brokers_scram
@@ -75,7 +76,7 @@ locals {
 
   catalog_env = {
     for k in local.ecs_names : k => {
-      for ek, ev in local.raw[k].environment : ek => replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
+      for ek, ev in local.raw[k].environment : ek => replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(
         ev,
         "{{app_url}}", local.token_values.app_url),
         "{{bootstrap_admin_email}}", local.token_values.bootstrap_admin_email),
@@ -83,6 +84,7 @@ locals {
         "{{ollama_base_url}}", local.token_values.ollama_base_url),
         "{{ollama_model}}", local.token_values.ollama_model),
         "{{anthropic_model}}", local.token_values.anthropic_model),
+        "{{ai_knowledge_enabled}}", local.token_values.ai_knowledge_enabled),
         "{{mail_enabled}}", local.token_values.mail_enabled),
         "{{smtp_host}}", local.token_values.smtp_host),
         "{{kafka_bootstrap_scram}}", local.token_values.kafka_bootstrap_scram),

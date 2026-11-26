@@ -105,6 +105,7 @@ export const NAVIGATION: Record<RoleArea, NavItem[]> = {
     // Phase 11 (the onboarding queue above is "Approvals").
     { label: 'AI approvals', to: '/admin/ai/approvals', icon: 'sparkleQuestion', section: 'Operations' },
     { label: 'AI audit', to: '/admin/ai/audit', icon: 'sparkleCheck', section: 'Operations' },
+    { label: 'Help center', to: '/admin/ai/knowledge', icon: 'menuBook', section: 'Operations' },
     // One search across every service's audit events (operations admins only: it has sign-in addresses).
     { label: 'Audit log', to: '/admin/audit', permission: 'audit.view', icon: 'shield', section: 'Operations' },
     { label: 'Operations', to: '/admin/operations', icon: 'settings', section: 'Operations' },

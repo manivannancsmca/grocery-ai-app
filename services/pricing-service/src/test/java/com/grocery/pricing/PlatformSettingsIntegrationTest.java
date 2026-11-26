@@ -86,6 +86,18 @@ class PlatformSettingsIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void theAssistantsReadTheSameFeesThroughTheGatewayPath() throws Exception {
+        save("OPS_ADMIN", "{\"groceryMinimumOrder\":150,\"groceryFreeAbove\":600}", 0).andExpect(status().isOk());
+
+        mvc.perform(get("/api/pricing/delivery-fees").with(customer(UUID.randomUUID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groceryMinimumOrder").value(150.00))
+                .andExpect(jsonPath("$.groceryFreeAbove").value(600.00))
+                .andExpect(jsonPath("$.groceryBaseFee").value(25.00));
+        mvc.perform(get("/api/pricing/delivery-fees")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void anOverrideIsWhatCartServiceReadsNext() throws Exception {
         save("OPS_ADMIN", "{\"groceryBaseFee\":40,\"groceryIncludedKm\":2.5,\"groceryMinimumOrder\":150.5}", 0)
                 .andExpect(status().isOk())

@@ -221,8 +221,18 @@ resource "aws_iam_role" "task" {
 }
 
 data "aws_iam_policy_document" "task" {
-  # The Spring services call no AWS API themselves (secrets arrive as env vars); only the sidecar does. This guardrail
-  # also keeps the document non-empty for units without a sidecar (schema-registry).
+  # The Spring services call no AWS API themselves (secrets arrive as env vars); only the sidecar does, and
+  # ai-orchestrator-service's knowledge base calls Bedrock for embeddings (bedrock_model_arns). This guardrail also
+  # keeps the document non-empty for units without a sidecar (schema-registry).
+  dynamic "statement" {
+    for_each = length(var.bedrock_model_arns) > 0 ? [1] : []
+    content {
+      sid       = "InvokeBedrockModels"
+      actions   = ["bedrock:InvokeModel"]
+      resources = var.bedrock_model_arns
+    }
+  }
+
   statement {
     sid       = "NoIamFromTasks"
     effect    = "Deny"

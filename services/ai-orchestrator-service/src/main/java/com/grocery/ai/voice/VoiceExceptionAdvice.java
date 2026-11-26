@@ -1,7 +1,10 @@
 package com.grocery.ai.voice;
 
 import com.grocery.ai.config.AiProperties;
+import com.grocery.ai.knowledge.KnowledgeException;
+import com.grocery.ai.knowledge.KnowledgeProperties;
 import com.grocery.common.correlation.CorrelationId;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -21,10 +24,14 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 @Order(Ordered.HIGHEST_PRECEDENCE + 6)
 public class VoiceExceptionAdvice {
 
-    private final long maxAudioBytes;
+    private static final String KNOWLEDGE_PATH = "/api/admin/ai/knowledge";
 
-    public VoiceExceptionAdvice(AiProperties properties) {
+    private final long maxAudioBytes;
+    private final long maxDocumentBytes;
+
+    public VoiceExceptionAdvice(AiProperties properties, KnowledgeProperties knowledge) {
         this.maxAudioBytes = properties.voice().maxAudioBytes();
+        this.maxDocumentBytes = knowledge.upload().maxFileSize().toBytes();
     }
 
     @ExceptionHandler(VoiceException.class)
@@ -43,8 +50,20 @@ public class VoiceExceptionAdvice {
         return response.body(problem);
     }
 
+    /**
+     * The servlet refused a multipart body above its limit before any controller ran: a knowledge base upload is
+     * DOCUMENT_TOO_LARGE (its own limit is lower, so this only happens far above it), anything else a recording.
+     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ProblemDetail> tooLarge(MaxUploadSizeExceededException ex) {
+    public ResponseEntity<ProblemDetail> tooLarge(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        if (request.getRequestURI().startsWith(KNOWLEDGE_PATH)) {
+            KnowledgeException tooLarge = KnowledgeException.tooLarge(maxDocumentBytes);
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(tooLarge.status(), tooLarge.getMessage());
+            problem.setProperty("errorCode", tooLarge.errorCode());
+            tooLarge.properties().forEach(problem::setProperty);
+            return ResponseEntity.status(tooLarge.status()).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(problem);
+        }
         return voice(VoiceException.tooLarge(maxAudioBytes));
     }
 }

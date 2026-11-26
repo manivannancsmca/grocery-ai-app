@@ -117,6 +117,7 @@ the request metrics of its service; a Loki line links to its trace; Prometheus e
 | Databases & caches | `grocery-data` |
 | Business | `grocery-business` |
 | Order trace explorer | `grocery-trace-explorer` |
+| Knowledge base (help center, RAG: docs/rag/) | `grocery-knowledge-base` |
 
 They use the datasource UIDs `prometheus`, `loki`, `tempo` (and `alertmanager`), provisioned by
 `grafana/provisioning/datasources/datasources.yml`; in Amazon Managed Grafana create the datasources with the same

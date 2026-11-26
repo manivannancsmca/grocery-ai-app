@@ -165,6 +165,29 @@ groups:
           dashboard: "http://localhost:3000/d/grocery-business"
           runbook: "docs/operations/troubleshooting.md#aimodelunavailable"
 
+      # Knowledge base (RAG, docs/rag/RAG-TROUBLESHOOTING.md)
+      - alert: KnowledgeIngestionFailing
+        expr: sum by (service) (increase(grocery_ai_knowledge_ingestions_total{outcome="FAILED"}[30m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} help-center document(s) failed to index in 30 minutes"
+          description: "Uploaded documents could not be indexed (embedding model or Elasticsearch); Admin → Help center shows each reason."
+          dashboard: "http://localhost:3000/d/grocery-knowledge-base"
+          runbook: "docs/rag/RAG-TROUBLESHOOTING.md#knowledgeingestionfailing"
+
+      - alert: KnowledgeRetrievalErrors
+        expr: sum by (service) (increase(grocery_ai_knowledge_retrievals_total{outcome="ERROR"}[15m])) >= 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} help-center searches failed in 15 minutes"
+          description: "The assistants cannot reach the knowledge base (Elasticsearch or the embedding model) and say they cannot check policies right now."
+          dashboard: "http://localhost:3000/d/grocery-knowledge-base"
+          runbook: "docs/rag/RAG-TROUBLESHOOTING.md#knowledgeretrievalerrors"
+
       - alert: EmailFailures
         expr: sum by (service) (increase(grocery_emails_total{status="FAILED"}[30m])) > 0
         for: 0m

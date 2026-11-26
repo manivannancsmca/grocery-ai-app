@@ -3,6 +3,7 @@ package com.grocery.ai.agent;
 import com.grocery.ai.link.Pages;
 import com.grocery.ai.tool.AdminTools;
 import com.grocery.ai.tool.DeliveryTools;
+import com.grocery.ai.tool.KnowledgeTools;
 import com.grocery.ai.tool.PaymentTools;
 import com.grocery.ai.tool.RestaurantTools;
 import com.grocery.ai.tool.ShoppingTools;
@@ -75,12 +76,34 @@ public class Agents {
             app shows it. Never guess or make up figures.
             """;
 
+    /**
+     * The help center's rule, in every assistant's prompt when the knowledge base is on
+     * (docs/rag/RAG-MCP-INTEGRATION.md): policies and how-tos only from its articles, never from general knowledge;
+     * the user's own data only from tools.
+     */
+    static final String KNOWLEDGE = """
+            The help center:
+            - Questions about the app's rules or how it works (refunds, returns, cancellations, delivery, payment \
+            methods, accounts, registration, onboarding, guidelines, product storage) are answered only from \
+            help-center articles: those the app gives you in a note, or what searchHelpCenter returns. Never answer \
+            them from general knowledge, and never add a rule, fee, amount or time limit an article does not state. \
+            If no article answers it, say you couldn't find verified information about it and suggest contacting \
+            customer support.
+            - Amounts admins set (the minimum order, delivery fees, the free-delivery limit) come only from \
+            getStoreRules, never from articles or memory.
+            - Articles explain rules. The user's own orders, cart, payments, stock and prices always come from your \
+            other tools.
+            """;
+
     private final List<AgentDefinition> agents;
 
     public Agents(ShoppingTools shoppingTools, AdminTools adminTools, VendorTools vendorTools,
                   RestaurantTools restaurantTools, DeliveryTools deliveryTools, PaymentTools paymentTools,
-                  SupportTools supportTools) {
+                  SupportTools supportTools, KnowledgeTools knowledgeTools) {
         List<ToolSpec> shopping = shoppingTools.tools();
+        // The help center (knowledge base): every assistant, only when it is enabled.
+        List<ToolSpec> knowledge = knowledgeTools.tools();
+        String knowledgeRule = knowledge.isEmpty() ? "" : KNOWLEDGE;
         this.agents = List.of(
                 new AgentDefinition(SHOPPING, "Shopping assistant",
                         "Finds groceries and restaurants, fills your cart, checks out, follows your orders and "
@@ -115,8 +138,8 @@ public class Agents {
                         failed, is pending or was refunded: the Payment assistant. Tracking a delivery, return status \
                         and complaints: the Customer support assistant. Help with what your tools show and name the \
                         right one.
-                        """ + Pages.linkRule(Pages.SHOPPING_PAGES) + CONVERSATION + SAFETY,
-                        shopping),
+                        """ + Pages.linkRule(Pages.SHOPPING_PAGES) + CONVERSATION + knowledgeRule + SAFETY,
+                        concat(shopping, knowledge)),
                 new AgentDefinition(PAYMENT, "Payment assistant",
                         "Checks your payments: whether one went through, why one failed, how long you have to pay, "
                                 + "and your refunds.",
@@ -150,8 +173,8 @@ public class Agents {
                         - "Where is my order", the delivery partner, returns and complaints: say that the Customer \
                         support assistant handles them and that they can switch to it at the top of this panel. \
                         Products and the cart: the Shopping assistant.
-                        """ + Pages.linkRule(Pages.PAYMENT_PAGES) + CONVERSATION + SAFETY,
-                        concat(paymentTools.tools(), pick(shopping, "cancelOrder"))),
+                        """ + Pages.linkRule(Pages.PAYMENT_PAGES) + CONVERSATION + knowledgeRule + SAFETY,
+                        concat(paymentTools.tools(), pick(shopping, "cancelOrder"), knowledge)),
                 new AgentDefinition(SUPPORT, "Customer support assistant",
                         "Helps with your orders: where an order is, cancellations, returns and refunds, and "
                                 + "complaints to our support team.",
@@ -192,10 +215,10 @@ public class Agents {
                         answer when there is one.
                         - Products, the cart and checkout belong to the Shopping assistant; detailed payment help to \
                         the Payment assistant. Suggest switching (at the top of this panel) when that fits.
-                        """ + Pages.linkRule(Pages.SUPPORT_PAGES) + CONVERSATION + SAFETY,
+                        """ + Pages.linkRule(Pages.SUPPORT_PAGES) + CONVERSATION + knowledgeRule + SAFETY,
                         concat(pick(shopping, "listMyOrders", "getOrderStatus"), supportTools.tools(),
                                 pick(shopping, "cancelOrder", "requestReturn"),
-                                List.of(paymentTools.getPaymentStatus()))),
+                                List.of(paymentTools.getPaymentStatus()), knowledge)),
                 new AgentDefinition(ADMIN_BI, "Business intelligence assistant",
                         "Answers questions about the business: orders, payments, stuck orders, reconciliation and "
                                 + "the vendors, restaurants and delivery partners on the platform; proposes refunds, "
@@ -218,8 +241,8 @@ public class Agents {
                         stock in their own inventory.
                         - Refunds, order cancellations and vendor or restaurant suspensions are only proposed: the \
                         tool creates an approval request that an authorised admin decides (some need a second admin).
-                        """ + Pages.linkRule(Pages.ADMIN_PAGES) + CONVERSATION + SAFETY,
-                        adminTools.tools()),
+                        """ + Pages.linkRule(Pages.ADMIN_PAGES) + CONVERSATION + knowledgeRule + SAFETY,
+                        concat(adminTools.tools(), knowledge)),
                 new AgentDefinition(VENDOR, "Vendor assistant",
                         "Checks your stock, prices, orders, sales, returns and reviews; prepares stock and price "
                                 + "changes and purchase orders for you to approve.",
@@ -241,8 +264,8 @@ public class Agents {
                         pricing; say so when it applies.
                         - draftPurchaseOrder only creates a DRAFT (nothing is sent to the supplier); get the \
                         supplier id from listSuppliers.
-                        """ + Pages.linkRule(Pages.VENDOR_PAGES) + CONVERSATION + SAFETY,
-                        vendorTools.tools()),
+                        """ + Pages.linkRule(Pages.VENDOR_PAGES) + CONVERSATION + knowledgeRule + SAFETY,
+                        concat(vendorTools.tools(), knowledge)),
                 new AgentDefinition(RESTAURANT, "Restaurant assistant",
                         "Shows your order queue, menu, sales, reported problems and reviews; prepares marking "
                                 + "dishes sold out and accepting or rejecting orders for you to approve.",
@@ -258,8 +281,8 @@ public class Agents {
                         - setMenuItemAvailability, acceptOrder and rejectOrder only prepare an approval the owner \
                         approves in the app. Only NEW orders can be accepted (5–180 minutes to prepare) or rejected \
                         (reason OUT_OF_STOCK, STORE_CLOSED, TOO_BUSY or OTHER with a note).
-                        """ + Pages.linkRule(Pages.RESTAURANT_PAGES) + CONVERSATION + SAFETY,
-                        restaurantTools.tools()),
+                        """ + Pages.linkRule(Pages.RESTAURANT_PAGES) + CONVERSATION + knowledgeRule + SAFETY,
+                        concat(restaurantTools.tools(), knowledge)),
                 new AgentDefinition(DELIVERY, "Delivery assistant",
                         "For delivery partners: your active delivery, offers, history and summary. For delivery "
                                 + "managers: the delivery monitor and reassignments for approval.",
@@ -282,8 +305,8 @@ public class Agents {
                         only prepares an approval that a delivery manager or operations admin approves; without a \
                         partnerId the delivery searches again for the nearest partner.
                         - Never use the other role's tools; they are refused.
-                        """ + Pages.linkRule(Pages.DELIVERY_PAGES) + CONVERSATION + SAFETY,
-                        deliveryTools.tools()));
+                        """ + Pages.linkRule(Pages.DELIVERY_PAGES) + CONVERSATION + knowledgeRule + SAFETY,
+                        concat(deliveryTools.tools(), knowledge)));
     }
 
     /** The named tools of {@code tools}, in that order; a missing name fails at startup, not in a chat. */

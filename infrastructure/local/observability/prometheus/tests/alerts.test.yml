@@ -370,6 +370,54 @@ tests:
               dashboard: "http://localhost:3000/d/grocery-business"
               runbook: "docs/operations/troubleshooting.md#aimodelunavailable"
 
+  # ---------------------------------------------------------------- KnowledgeIngestionFailing
+  - name: KnowledgeIngestionFailing fires when a help-center document fails to index
+    interval: 1m
+    input_series:
+      - series: 'grocery_ai_knowledge_ingestions_total{job="services", service="ai-orchestrator-service", instance="ai-orchestrator-service:8115", outcome="FAILED"}'
+        values: '0x15 1x10'
+      - series: 'grocery_ai_knowledge_ingestions_total{job="services", service="ai-orchestrator-service", instance="ai-orchestrator-service:8115", outcome="COMPLETED"}'
+        values: '0+1x25'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: KnowledgeIngestionFailing
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: KnowledgeIngestionFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: ai-orchestrator-service
+            exp_annotations:
+              summary: "1 help-center document(s) failed to index in 30 minutes"
+              description: "Uploaded documents could not be indexed (embedding model or Elasticsearch); Admin → Help center shows each reason."
+              dashboard: "http://localhost:3000/d/grocery-knowledge-base"
+              runbook: "docs/rag/RAG-TROUBLESHOOTING.md#knowledgeingestionfailing"
+
+  # ---------------------------------------------------------------- KnowledgeRetrievalErrors
+  - name: KnowledgeRetrievalErrors fires from 5 failed searches in 15 minutes, not for no-match answers
+    interval: 1m
+    input_series:
+      - series: 'grocery_ai_knowledge_retrievals_total{job="services", service="ai-orchestrator-service", instance="ai-orchestrator-service:8115", agent="shopping", source="before", outcome="ERROR"}'
+        values: '0x10 5x10'
+      - series: 'grocery_ai_knowledge_retrievals_total{job="services", service="ai-orchestrator-service", instance="ai-orchestrator-service:8115", agent="shopping", source="before", outcome="NO_MATCH"}'
+        values: '0+10x20'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: KnowledgeRetrievalErrors
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: KnowledgeRetrievalErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: ai-orchestrator-service
+            exp_annotations:
+              summary: "5 help-center searches failed in 15 minutes"
+              description: "The assistants cannot reach the knowledge base (Elasticsearch or the embedding model) and say they cannot check policies right now."
+              dashboard: "http://localhost:3000/d/grocery-knowledge-base"
+              runbook: "docs/rag/RAG-TROUBLESHOOTING.md#knowledgeretrievalerrors"
+
   # ---------------------------------------------------------------- EmailFailures
   - name: EmailFailures sums both notification replicas
     interval: 1m

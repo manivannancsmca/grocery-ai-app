@@ -76,7 +76,7 @@ run "plan" {
   }
 
   assert {
-    condition     = length(output.placeholder_secrets) == 3
-    error_message = "Expected the Razorpay, Elasticsearch and SMTP placeholder secrets."
+    condition     = length(output.placeholder_secrets) == 5
+    error_message = "Expected the Razorpay, SMTP, Anthropic and both Elasticsearch (catalog-query, knowledge base) placeholder secrets."
   }
 }

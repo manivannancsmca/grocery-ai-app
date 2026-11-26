@@ -3,6 +3,7 @@
 import { Alert } from '../../shared/components/ui'
 import { Icon } from '../../shared/icons'
 import { AnswerLinks } from './AnswerLinks'
+import { AnswerSources } from './AnswerSources'
 import { ApprovalCard } from './ApprovalCard'
 import { FormattedText } from './FormattedText'
 import { answerLinks, isAgentPage } from './pageLinks'
@@ -73,6 +74,7 @@ export function MessageView({ message, agent, onNavigate, speech }) {
             <span>{message.notice.message}</span>
           </p>
         )}
+        {!writing && <AnswerSources sources={message.sources ?? []} />}
         <AnswerLinks links={links} onNavigate={onNavigate} />
         {speech && message.status === 'done' && message.content && (
           <ListenButton messageKey={message.key} text={message.content} speech={speech} />

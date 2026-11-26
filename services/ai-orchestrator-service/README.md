@@ -239,10 +239,24 @@ understands: `add <n> <words>`, `search|find <words>`, `cart|show my cart`, `che
 (restaurant); `active delivery`, `deliveries`, `reassign <NO>` (delivery); `use tool <name> <json>` (every agent). For
 insights it answers the rules' report as JSON.
 
+## Knowledge base (RAG, [docs/rag/](../../docs/rag/RAG-ARCHITECTURE.md))
+
+The assistants answer policy and how-to questions from help-center articles admins upload
+(`/api/admin/ai/knowledge`, Admin → Help center), with the source shown under the answer ("From the help center:
+Refund policy"). Package `com.grocery.ai.knowledge`: validation and text extraction (PDF, DOCX, HTML, TXT, Markdown),
+chunking, embeddings (Ollama `nomic-embed-text` locally, Bedrock Titan V2 in AWS), the service's own Elasticsearch
+index `grocery-knowledge` ([ADR-0015](../../docs/adr/0015-knowledge-base-in-elasticsearch.md)) and semantic search
+filtered by the reader's audiences. `KnowledgeAssist` looks a policy question up before the model (rules decide, not the
+model; other messages get articles only above a higher, calibrated threshold), reads the live minimum order and fees
+for questions about them, and gives the controlled reply when nothing matches; the tools `searchHelpCenter` and
+`getStoreRules` go through ToolGuard. Live data still comes only from the business APIs. Off unless
+`AI_KNOWLEDGE_ENABLED=true` (Docker Compose turns it on); setup in [RAG-LOCAL-SETUP.md](../../docs/rag/RAG-LOCAL-SETUP.md).
+
 ## Configuration
 
 | Property | Env | Default |
 |---|---|---|
+| `grocery.ai.knowledge.enabled` | `AI_KNOWLEDGE_ENABLED` | `false`: the knowledge base (all its settings: [docs/rag/RAG-ARCHITECTURE.md §9](../../docs/rag/RAG-ARCHITECTURE.md#9-configuration-at-a-glance)) |
 | `grocery.ai.provider` | `AI_PROVIDER` | `ollama` (`anthropic`: Claude, the production model; `scripted`: local/docker only) |
 | `grocery.ai.anthropic.api-key` / `.model` | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | empty (= unavailable, nothing sent) / `claude-opus-5-5` |
 | `grocery.ai.anthropic.base-url`, `.max-tokens`, `.max-retries` | `ANTHROPIC_BASE_URL`, `AI_ANTHROPIC_MAX_TOKENS`, `AI_ANTHROPIC_MAX_RETRIES` | `https://api.anthropic.com`, `2048`, `1` |

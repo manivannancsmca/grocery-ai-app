@@ -328,6 +328,12 @@ variable "anthropic_model" {
   default     = "claude-opus-5-5"
 }
 
+variable "ai_knowledge_enabled" {
+  description = "AI_KNOWLEDGE_ENABLED: ai-orchestrator-service's knowledge base (RAG). Turn on once its Elasticsearch API key is in grocery/<env>/ai-orchestrator-service/elasticsearch and Amazon Titan Text Embeddings V2 is enabled in Bedrock (docs/rag/RAG-LOCAL-SETUP.md)."
+  type        = bool
+  default     = false
+}
+
 variable "ollama_base_url" {
   description = "OLLAMA_BASE_URL (null = no model endpoint: the assistant answers AI_UNAVAILABLE)."
   type        = string

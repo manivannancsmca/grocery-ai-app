@@ -65,6 +65,7 @@ events' schemas are in `libs/grocery-event-schemas` **1.4.0**. Design: [ADR-0008
 | `token` | `{ "text" }` | the answer, in chunks |
 | `retry` | `{ "code": ACTION\|UNSEEN\|FIGURES, "message" }` | at most once: the answer so far used no tool although it needed one; drop its text, the new answer's events follow (§11) |
 | `notice` | `{ "code": UNVERIFIED_FIGURES, "message" }` | before `done`: the answer states figures no tool returned (§11) |
+| `sources` | `{ "sources": [{ "documentId", "title", "category" }] }` | before `done`, when the answer used help-center articles (knowledge base, [docs/rag/](../rag/RAG-API-REFERENCE.md)); also `messages[].sources` of a conversation |
 | `done` | `{ "messageId", "finishReason" }` | last, on success |
 | `error` | `{ "code", "message" }` | last, on failure: `AI_UNAVAILABLE` (model unreachable), `AI_TIMEOUT`, `AI_TOOL_LIMIT` (more than 6 tool calls in one message), `AI_ERROR`. `message` is user-friendly ("The assistant is not available right now. Everything else works as usual.") |
 

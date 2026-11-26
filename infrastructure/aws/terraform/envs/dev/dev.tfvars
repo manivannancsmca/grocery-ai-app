@@ -88,4 +88,5 @@ secret_recovery_window_days  = 0
 bootstrap_admin_email = "admin@grocery.example.com" # REPLACE
 ai_provider           = "anthropic"                 # Claude; set the key in grocery/dev/ai-orchestrator-service/anthropic (api_key)
 ollama_base_url       = null                        # no model endpoint yet: the assistant answers AI_UNAVAILABLE
+ai_knowledge_enabled  = false                       # help center (RAG): true after the Elasticsearch API key and Bedrock Titan V2 access exist (docs/rag/RAG-LOCAL-SETUP.md)
 mail_enabled          = false

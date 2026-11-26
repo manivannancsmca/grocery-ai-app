@@ -58,6 +58,11 @@ module "service" {
   secrets               = local.service_secrets[each.key]
   secret_arns           = local.service_secret_arns[each.key]
   secret_kms_key_arns   = [module.secrets.kms_key_arn]
+  # Foundation models named in the catalog's "bedrock_models" (ai-orchestrator-service: the knowledge base's embeddings)
+  bedrock_model_arns = [
+    for model in try(local.raw[each.key].bedrock_models, []) :
+    "arn:${local.partition}:bedrock:${local.region}::foundation-model/${model}"
+  ]
 
   subnet_ids                    = module.network.private_subnet_ids
   security_group_ids            = [module.ecs_cluster.tasks_security_group_id]

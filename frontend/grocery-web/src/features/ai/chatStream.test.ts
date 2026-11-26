@@ -128,6 +128,21 @@ describe('streamChat — the POST text/event-stream client', () => {
 })
 
 describe('parseChatEvent', () => {
+  it('reads the help-center sources of an answer, keeping only well-formed entries', () => {
+    const data = JSON.stringify({
+      sources: [{ documentId: 'd1', title: 'Refund policy', category: 'POLICIES' }, { title: 'no id' }, 'junk', { documentId: 'd2', title: 'Delivery' }],
+    })
+    expect(parseChatEvent({ type: 'sources', data, id: null, lastEventId: '' })).toEqual({
+      type: 'sources',
+      sources: [
+        { documentId: 'd1', title: 'Refund policy', category: 'POLICIES' },
+        { documentId: 'd2', title: 'Delivery', category: '' },
+      ],
+    })
+    expect(parseChatEvent({ type: 'sources', data: '{"sources":[]}', id: null, lastEventId: '' })).toBeNull()
+    expect(parseChatEvent({ type: 'sources', data: '{}', id: null, lastEventId: '' })).toBeNull()
+  })
+
   it('reads a retry event, with a default text when the server sends none', () => {
     expect(parseChatEvent({ type: 'retry', data: '{"code":"ACTION","message":"Checking that with the app…"}', id: null, lastEventId: '' })).toEqual({
       type: 'retry',

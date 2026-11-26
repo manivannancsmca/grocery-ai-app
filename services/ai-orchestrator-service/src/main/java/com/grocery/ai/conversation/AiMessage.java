@@ -50,6 +50,10 @@ public class AiMessage {
     @Column(name = "unverified_figures", nullable = false)
     private boolean unverifiedFigures;
 
+    /** The help-center documents the answer was given, as JSON (ConversationService); null for none. */
+    @Column(columnDefinition = "TEXT")
+    private String sources;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -79,6 +83,14 @@ public class AiMessage {
 
     public boolean hasUnverifiedFigures() {
         return unverifiedFigures;
+    }
+
+    public void setSources(String sourcesJson) {
+        sources = sourcesJson;
+    }
+
+    public String getSources() {
+        return sources;
     }
 
     public UUID getId() {

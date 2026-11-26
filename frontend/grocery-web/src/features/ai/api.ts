@@ -196,6 +196,16 @@ export interface ApprovalView {
 
 export type MessageRole = 'USER' | 'ASSISTANT'
 
+/**
+ * A help-center document an answer was given (knowledge base, docs/rag/RAG-API-REFERENCE.md): the `sources` stream
+ * event and `messages[].sources`. Only its title and category — never its text or anything about the index.
+ */
+export interface KnowledgeSource {
+  documentId: string
+  title: string
+  category: string
+}
+
 export interface ConversationMessage {
   id: string
   role: MessageRole | (string & {})
@@ -205,6 +215,8 @@ export interface ConversationMessage {
   approvals: ApprovalView[]
   /** An answer that stated figures no tool returned (not checked against the app's data); absent from older servers. */
   unverified?: boolean
+  /** The help-center documents the answer was given; absent from older servers. */
+  sources?: KnowledgeSource[]
 }
 
 export interface ConversationSummary {

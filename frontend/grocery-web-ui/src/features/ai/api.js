@@ -239,6 +239,15 @@ export function isSelfDecidedAction(action) {
 /** @typedef {'USER' | 'ASSISTANT'} MessageRole */
 
 /**
+ * A help-center document an answer was given (knowledge base, docs/rag/RAG-API-REFERENCE.md): the `sources` stream
+ * event and `messages[].sources`. Only its title and category — never its text or anything about the index.
+ * @typedef {object} KnowledgeSource
+ * @property {string} documentId
+ * @property {string} title
+ * @property {string} category
+ */
+
+/**
  * @typedef {object} ConversationMessage
  * @property {string} id
  * @property {MessageRole | (string & {})} role
@@ -247,6 +256,7 @@ export function isSelfDecidedAction(action) {
  * @property {ToolActivity[]} tools
  * @property {ApprovalView[]} approvals
  * @property {boolean} [unverified] An answer that stated figures no tool returned (not checked against the app's data); absent from older servers.
+ * @property {KnowledgeSource[]} [sources] The help-center documents the answer was given; absent from older servers.
  */
 
 /**

@@ -79,6 +79,9 @@ if /i "%SERVICE%"=="ai-orchestrator-service" (
   rem ("docker compose --profile voice up -d") has the speech-to-text model; otherwise "browser" (the browser's own
   rem speech features). Set AI_VOICE_MODE (and AI_VOICE_BASE_URL) to choose yourself.
   call :pick_voice_mode
+  rem Knowledge base (RAG, docs\rag\RAG-LOCAL-SETUP.md): on when Elasticsearch answers and Ollama lists the
+  rem embedding model (nomic-embed-text); set AI_KNOWLEDGE_ENABLED=true/false to choose yourself.
+  call :pick_knowledge_base
   if defined GATEWAY_PORT set "GROCERY_AI_GATEWAY_URL=http://localhost:%GATEWAY_PORT%"
 )
 
@@ -89,6 +92,7 @@ echo  jar  : %JAR%
 echo  profile %SPRING_PROFILES_ACTIVE%, heap %HEAP%   (Ctrl+C stops it)
 if /i "%SERVICE%"=="ai-orchestrator-service" echo  AI   : %AI_PROVIDER% %AI_PROVIDER_NOTE%
 if /i "%SERVICE%"=="ai-orchestrator-service" echo  Voice: %AI_VOICE_MODE% %AI_VOICE_NOTE%
+if /i "%SERVICE%"=="ai-orchestrator-service" echo  Help : knowledge base %AI_KNOWLEDGE_ENABLED% %AI_KNOWLEDGE_NOTE%
 if /i "%SERVICE%"=="payment-service" if defined RAZORPAY_KEY_ID echo  Pay  : Razorpay test mode, keys from ..\.env
 if /i "%SERVICE%"=="payment-service" if not defined RAZORPAY_KEY_ID echo  Pay  : built-in payment simulator, no Razorpay keys in ..\.env
 echo ============================================================
@@ -179,6 +183,28 @@ if not defined AI_VOICE_SPEECH_MODEL set "AI_VOICE_SPEECH_MODEL=speaches-ai/Koko
 if not defined AI_VOICE_SPEECH_VOICE set "AI_VOICE_SPEECH_VOICE=af_heart"
 if not defined AI_VOICE_TIMEOUT set "AI_VOICE_TIMEOUT=60s"
 set "AI_VOICE_NOTE=- speaches at %AI_VOICE_BASE_URL% (%AI_VOICE_TRANSCRIPTION_MODEL%)"
+goto :eof
+
+:pick_knowledge_base
+if not defined AI_EMBEDDING_MODEL set "AI_EMBEDDING_MODEL=nomic-embed-text"
+if not defined ES_HOST_PORT set "ES_HOST_PORT=9200"
+if not defined ELASTICSEARCH_URIS set "ELASTICSEARCH_URIS=http://localhost:%ES_HOST_PORT%"
+if defined AI_KNOWLEDGE_ENABLED (
+  set "AI_KNOWLEDGE_NOTE=- set by AI_KNOWLEDGE_ENABLED"
+  goto :eof
+)
+set "AI_KNOWLEDGE_ENABLED=false"
+set "AI_KNOWLEDGE_NOTE=- off: needs Elasticsearch at %ELASTICSEARCH_URIS% and %AI_EMBEDDING_MODEL% in Ollama (docker compose --profile ai up -d)"
+if not defined OLLAMA_BASE_URL goto :eof
+where curl.exe >nul 2>&1
+if errorlevel 1 goto :eof
+curl.exe -s -f -m 3 "%ELASTICSEARCH_URIS%/_cluster/health" >nul 2>&1
+if errorlevel 1 goto :eof
+curl.exe -s -m 3 "%OLLAMA_BASE_URL%/api/tags" 2>nul | findstr /i /c:"\"%AI_EMBEDDING_MODEL%\"" /c:"\"%AI_EMBEDDING_MODEL%:latest\"" >nul
+if errorlevel 1 goto :eof
+set "AI_KNOWLEDGE_ENABLED=true"
+if not defined AI_KNOWLEDGE_SEED set "AI_KNOWLEDGE_SEED=true"
+set "AI_KNOWLEDGE_NOTE=- Elasticsearch %ELASTICSEARCH_URIS%, embeddings %AI_EMBEDDING_MODEL% at %OLLAMA_BASE_URL%"
 goto :eof
 
 :find_java

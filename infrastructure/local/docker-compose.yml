@@ -359,7 +359,7 @@ services:
       timeout: 5s
       retries: 10
 
-  ollama-init:                      # one-shot: pulls OLLAMA_MODEL into the volume
+  ollama-init:                      # one-shot: pulls OLLAMA_MODEL and OLLAMA_EMBEDDING_MODEL into the volume
     image: ollama/ollama:0.40.15
     profiles: ["ai", "all"]
     restart: "no"
@@ -369,6 +369,7 @@ services:
     environment:
       OLLAMA_HOST: ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b-instruct}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL-nomic-embed-text}   # knowledge base (RAG); empty = skip
     volumes:
       - ./ollama/pull-model.sh:/scripts/pull-model.sh:ro
 
@@ -922,6 +923,12 @@ services:
       AI_VOICE_SPEECH_MODEL: ${AI_VOICE_SPEECH_MODEL:-speaches-ai/Kokoro-82M-v1.0-ONNX}
       AI_VOICE_SPEECH_VOICE: ${AI_VOICE_SPEECH_VOICE:-af_heart}
       AI_VOICE_TIMEOUT: ${AI_VOICE_TIMEOUT:-60s}                 # CPU speech recognition is slower than OpenAI
+      # Knowledge base (RAG, docs/rag/RAG-LOCAL-SETUP.md): its own index in the stack's Elasticsearch (profile
+      # "search"/"all") and Ollama's embedding model. Without Elasticsearch the assistants work as before.
+      AI_KNOWLEDGE_ENABLED: ${AI_KNOWLEDGE_ENABLED:-true}
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
+      AI_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      AI_KNOWLEDGE_SEED: ${AI_KNOWLEDGE_SEED:-true}              # load the starter help-center articles once
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${AI_ORCHESTRATOR_HOST_PORT:-8115}:8115"
     healthcheck:

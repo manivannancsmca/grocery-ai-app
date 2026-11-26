@@ -129,6 +129,14 @@ export const adminRoutes = {
         return { Component: AiAuditPage }
       },
     },
+    // The help center (knowledge base) the assistants answer policy questions from: every admin looks, two roles change.
+    {
+      path: 'ai/knowledge',
+      lazy: async () => {
+        const { KnowledgeBasePage } = await import('./pages/KnowledgeBasePage')
+        return { Component: KnowledgeBasePage }
+      },
+    },
     {
       path: 'system',
       lazy: async () => {
